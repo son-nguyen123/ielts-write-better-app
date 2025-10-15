@@ -66,33 +66,140 @@ export function ChatInterface() {
 
       const decoder = new TextDecoder()
       let assistantMessage = ""
+      let buffer = ""
+      let streamError: string | null = null
+      let streamFinished = false
 
-      while (true) {
+      const extractText = (payload: unknown): string => {
+        if (payload == null) return ""
+        if (typeof payload === "string") return payload
+        if (Array.isArray(payload)) {
+          return payload.map((item) => extractText(item)).join("")
+        }
+        if (typeof payload === "object") {
+          const textLike =
+            (payload as { text?: unknown }).text ??
+            (payload as { delta?: unknown }).delta ??
+            (payload as { textDelta?: unknown }).textDelta ??
+            (payload as { value?: unknown }).value
+
+          if (typeof textLike === "string") {
+            return textLike
+          }
+
+          if ("message" in payload) {
+            return extractText((payload as { message?: unknown }).message)
+          }
+
+          if ("content" in payload) {
+            const content = (payload as { content?: unknown }).content
+            if (typeof content === "string") return content
+            return extractText(content)
+          }
+        }
+        return ""
+      }
+
+      const updateAssistantMessage = (text: string, { replace = false } = {}) => {
+        if (!text) return
+        assistantMessage = replace ? text : assistantMessage + text
+        setMessages((prev) => {
+          const newMessages = [...prev]
+          if (newMessages[newMessages.length - 1]?.role === "assistant") {
+            newMessages[newMessages.length - 1].content = assistantMessage
+          } else {
+            newMessages.push({ role: "assistant", content: assistantMessage })
+          }
+          return newMessages
+        })
+      }
+
+      while (!streamFinished) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          streamFinished = true
+          buffer += decoder.decode()
+        } else if (value) {
+          buffer += decoder.decode(value, { stream: true })
+        }
 
-        const chunk = decoder.decode(value)
-        const lines = chunk.split("\n")
+        const events = buffer.split("\n\n")
+        buffer = events.pop() ?? ""
 
-        for (const line of lines) {
-          if (line.startsWith("0:")) {
-            const text = line.slice(3, -1)
-            assistantMessage += text
-            setMessages((prev) => {
-              const newMessages = [...prev]
-              if (newMessages[newMessages.length - 1]?.role === "assistant") {
-                newMessages[newMessages.length - 1].content = assistantMessage
-              } else {
-                newMessages.push({ role: "assistant", content: assistantMessage })
+        for (const event of events) {
+          const lines = event
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue
+
+            const dataPayload = line.slice(5).trim()
+            if (!dataPayload) continue
+            if (dataPayload === "[DONE]") {
+              streamFinished = true
+              break
+            }
+
+            let parsed: unknown
+            try {
+              parsed = JSON.parse(dataPayload)
+            } catch (parseError) {
+              console.error("[v0] Failed to parse chat stream event:", parseError, dataPayload)
+              continue
+            }
+
+            if (
+              typeof parsed === "object" &&
+              parsed !== null &&
+              "type" in parsed &&
+              typeof (parsed as { type: unknown }).type === "string"
+            ) {
+              const eventType = (parsed as { type: string }).type
+
+              if (eventType === "error") {
+                const errorData = (parsed as { data?: { message?: unknown } }).data
+                const message =
+                  typeof errorData?.message === "string"
+                    ? (errorData.message as string)
+                    : "The AI encountered an unexpected error."
+                streamError = message
+                streamFinished = true
+                break
               }
-              return newMessages
-            })
+
+              if (eventType === "text-delta") {
+                const text = extractText((parsed as { data?: unknown }).data)
+                updateAssistantMessage(text)
+              } else if (eventType === "message") {
+                const text = extractText((parsed as { data?: unknown }).data ?? parsed)
+                updateAssistantMessage(text, { replace: true })
+              } else if (eventType === "response-finished") {
+                streamFinished = true
+                break
+              }
+            }
+          }
+
+          if (streamFinished) {
+            break
           }
         }
       }
 
+      if (streamError) {
+        throw new Error(streamError)
+      }
+
       if (!assistantMessage) {
-        throw new Error("The AI didn't return any content.")
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "I couldn't generate a response this time, but please try again with another prompt.",
+          },
+        ])
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
