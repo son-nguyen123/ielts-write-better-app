@@ -46,40 +46,65 @@ export function ChatInterface() {
         }),
       })
 
+      if (!response.ok) {
+        let errorMessage = "Sorry, I couldn't reach the AI right now. Please try again."
+        try {
+          const data = await response.json()
+          if (typeof data?.error === "string" && data.error.trim().length > 0) {
+            errorMessage = data.error
+          }
+        } catch (parseError) {
+          console.error("[v0] Failed to parse chat error response:", parseError)
+        }
+        throw new Error(errorMessage)
+      }
+
       const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("The AI response stream is empty.")
+      }
+
       const decoder = new TextDecoder()
       let assistantMessage = ""
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
 
-          const chunk = decoder.decode(value)
-          const lines = chunk.split("\n")
+        const chunk = decoder.decode(value)
+        const lines = chunk.split("\n")
 
-          for (const line of lines) {
-            if (line.startsWith("0:")) {
-              const text = line.slice(3, -1)
-              assistantMessage += text
-              setMessages((prev) => {
-                const newMessages = [...prev]
-                if (newMessages[newMessages.length - 1]?.role === "assistant") {
-                  newMessages[newMessages.length - 1].content = assistantMessage
-                } else {
-                  newMessages.push({ role: "assistant", content: assistantMessage })
-                }
-                return newMessages
-              })
-            }
+        for (const line of lines) {
+          if (line.startsWith("0:")) {
+            const text = line.slice(3, -1)
+            assistantMessage += text
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              if (newMessages[newMessages.length - 1]?.role === "assistant") {
+                newMessages[newMessages.length - 1].content = assistantMessage
+              } else {
+                newMessages.push({ role: "assistant", content: assistantMessage })
+              }
+              return newMessages
+            })
           }
         }
+      }
+
+      if (!assistantMessage) {
+        throw new Error("The AI didn't return any content.")
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
+        {
+          role: "assistant",
+          content:
+            error instanceof Error && error.message
+              ? error.message
+              : "Sorry, I encountered an error. Please try again.",
+        },
       ])
     } finally {
       setIsLoading(false)
