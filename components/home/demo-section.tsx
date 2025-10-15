@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
+import { useAiModelSelection } from "@/hooks/use-ai-model-selection"
 
 const sampleEssay = `Some people believe that technology has made our lives more complex, while others think it has simplified them. In my opinion, while technology has introduced certain complexities, it has overall made our lives significantly easier.
 
@@ -19,6 +22,7 @@ export function DemoSection() {
   const [text, setText] = useState(sampleEssay)
   const [isScoring, setIsScoring] = useState(false)
   const [feedback, setFeedback] = useState<any>(null)
+  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
 
   const handleRunDemo = async () => {
     setIsScoring(true)
@@ -31,6 +35,7 @@ export function DemoSection() {
           taskType: "Task 2",
           prompt:
             "Some people believe that technology has made our lives more complex, while others think it has simplified them. Discuss both views and give your opinion.",
+          model: selectedModel,
         }),
       })
 
@@ -55,12 +60,37 @@ export function DemoSection() {
 
         <div className="grid lg:grid-cols-2 gap-6">
           <Card className="rounded-2xl border-border bg-card">
-            <CardHeader>
-              <CardTitle>Your Essay</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={text}
+          <CardHeader>
+            <CardTitle>Your Essay</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 space-y-2">
+              <Label>AI Model</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model.value} value={model.value}>
+                      <div className="flex flex-col">
+                        <span>{model.label}</span>
+                        {model.description && <span className="text-xs text-muted-foreground">{model.description}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isLoadingModels && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...
+                </p>
+              )}
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+            </div>
+
+            <Textarea
+              value={text}
                 onChange={(e) => setText(e.target.value)}
                 className="min-h-[300px] font-mono text-sm"
                 placeholder="Paste your essay here..."

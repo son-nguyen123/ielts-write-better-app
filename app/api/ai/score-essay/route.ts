@@ -1,5 +1,6 @@
 import { generateObject } from "ai"
 import { z } from "zod"
+import { ensureGeminiApiKey, resolveModel } from "@/lib/ai"
 
 export const maxDuration = 60
 
@@ -41,7 +42,9 @@ const feedbackSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const { essay, taskType, prompt } = await req.json()
+    const { essay, taskType, prompt, model } = await req.json()
+
+    ensureGeminiApiKey()
 
     if (!essay || !taskType) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
@@ -68,7 +71,7 @@ Provide a comprehensive IELTS evaluation with:
 4. Action items for improvement`
 
     const { object } = await generateObject({
-      model: "google/gemini-2.5-flash-image",
+      model: resolveModel(model),
       schema: feedbackSchema,
       messages: [
         { role: "system", content: systemPrompt },
@@ -80,6 +83,7 @@ Provide a comprehensive IELTS evaluation with:
     return Response.json({ feedback: object })
   } catch (error) {
     console.error("[v0] Error scoring essay:", error)
-    return Response.json({ error: "Failed to score essay" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to score essay"
+    return Response.json({ error: message }, { status: 500 })
   }
 }

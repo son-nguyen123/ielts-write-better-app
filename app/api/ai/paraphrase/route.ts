@@ -1,5 +1,6 @@
 import { generateObject } from "ai"
 import { z } from "zod"
+import { ensureGeminiApiKey, resolveModel } from "@/lib/ai"
 
 export const maxDuration = 30
 
@@ -15,14 +16,16 @@ const paraphraseSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json()
+    const { text, model } = await req.json()
+
+    ensureGeminiApiKey()
 
     if (!text) {
       return Response.json({ error: "Text is required" }, { status: 400 })
     }
 
     const { object } = await generateObject({
-      model: "google/gemini-2.5-flash-image",
+      model: resolveModel(model),
       schema: paraphraseSchema,
       prompt: `Paraphrase the following text in 5 different styles for IELTS writing:
 
@@ -42,6 +45,7 @@ Each paraphrase should maintain the original meaning while demonstrating the spe
     return Response.json({ paraphrases: object.paraphrases })
   } catch (error) {
     console.error("[v0] Error generating paraphrases:", error)
-    return Response.json({ error: "Failed to generate paraphrases" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to generate paraphrases"
+    return Response.json({ error: message }, { status: 500 })
   }
 }

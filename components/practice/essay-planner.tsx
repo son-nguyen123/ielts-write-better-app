@@ -7,12 +7,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Sparkles, Send } from "lucide-react"
+import { useAiModelSelection } from "@/hooks/use-ai-model-selection"
 
 export function EssayPlanner() {
   const [topic, setTopic] = useState("")
   const [targetBand, setTargetBand] = useState("7.0")
   const [isGenerating, setIsGenerating] = useState(false)
   const [outline, setOutline] = useState<any>(null)
+  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -20,7 +22,7 @@ export function EssayPlanner() {
       const response = await fetch("/api/ai/generate-outline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, targetBand }),
+        body: JSON.stringify({ topic, targetBand, model: selectedModel }),
       })
 
       const data = await response.json()
@@ -53,6 +55,31 @@ export function EssayPlanner() {
             <CardDescription>Enter your topic and target band score</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>AI Model</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model.value} value={model.value}>
+                      <div className="flex flex-col">
+                        <span>{model.label}</span>
+                        {model.description && <span className="text-xs text-muted-foreground">{model.description}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isLoadingModels && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...
+                </p>
+              )}
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+            </div>
+
             <div className="space-y-2">
               <Label>Topic / Prompt</Label>
               <Textarea

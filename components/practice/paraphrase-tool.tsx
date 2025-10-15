@@ -5,8 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Sparkles, Copy, Check } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useAiModelSelection } from "@/hooks/use-ai-model-selection"
 
 export function ParaphraseTool() {
   const { toast } = useToast()
@@ -14,6 +17,7 @@ export function ParaphraseTool() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [paraphrases, setParaphrases] = useState<any[]>([])
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -21,7 +25,7 @@ export function ParaphraseTool() {
       const response = await fetch("/api/ai/paraphrase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input }),
+        body: JSON.stringify({ text: input, model: selectedModel }),
       })
 
       const data = await response.json()
@@ -73,6 +77,31 @@ export function ParaphraseTool() {
             <CardDescription>Enter a sentence or paragraph to paraphrase</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>AI Model</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model.value} value={model.value}>
+                      <div className="flex flex-col">
+                        <span>{model.label}</span>
+                        {model.description && <span className="text-xs text-muted-foreground">{model.description}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isLoadingModels && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...
+                </p>
+              )}
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+            </div>
+
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}

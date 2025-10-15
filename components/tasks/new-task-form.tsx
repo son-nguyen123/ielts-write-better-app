@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Save, Send } from "lucide-react"
+import { useAiModelSelection } from "@/hooks/use-ai-model-selection"
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ export function NewTaskForm() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
 
   const prompts = taskType === "Task 1" ? task1Prompts : task2Prompts
   const wordCount = response.trim().split(/\s+/).filter(Boolean).length
@@ -85,6 +87,7 @@ export function NewTaskForm() {
           essay: response,
           taskType,
           prompt: customPrompt,
+          model: selectedModel,
         }),
       })
 
@@ -184,6 +187,31 @@ export function NewTaskForm() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>AI Model</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model.value} value={model.value}>
+                      <div className="flex flex-col">
+                        <span>{model.label}</span>
+                        {model.description && <span className="text-xs text-muted-foreground">{model.description}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isLoadingModels && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...
+                </p>
+              )}
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+            </div>
+
             <Textarea
               value={response}
               onChange={(e) => setResponse(e.target.value)}

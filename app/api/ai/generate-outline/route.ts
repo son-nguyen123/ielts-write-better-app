@@ -1,5 +1,6 @@
 import { generateObject } from "ai"
 import { z } from "zod"
+import { ensureGeminiApiKey, resolveModel } from "@/lib/ai"
 
 export const maxDuration = 30
 
@@ -29,14 +30,16 @@ const outlineSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const { topic, targetBand } = await req.json()
+    const { topic, targetBand, model } = await req.json()
+
+    ensureGeminiApiKey()
 
     if (!topic) {
       return Response.json({ error: "Topic is required" }, { status: 400 })
     }
 
     const { object } = await generateObject({
-      model: "google/gemini-2.5-flash-image",
+      model: resolveModel(model),
       schema: outlineSchema,
       prompt: `Create a detailed essay outline for an IELTS Task 2 essay targeting band ${targetBand || "7.0"}.
 
@@ -56,6 +59,7 @@ Make it specific to the topic and appropriate for the target band score.`,
     return Response.json({ outline: object })
   } catch (error) {
     console.error("[v0] Error generating outline:", error)
-    return Response.json({ error: "Failed to generate outline" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to generate outline"
+    return Response.json({ error: message }, { status: 500 })
   }
 }

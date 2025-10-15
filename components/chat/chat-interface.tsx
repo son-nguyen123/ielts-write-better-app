@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Send, Bot, User } from "lucide-react"
+import { Send, Bot, User, Loader2 } from "lucide-react"
+import { useAiModelSelection } from "@/hooks/use-ai-model-selection"
 
 interface Message {
   role: "user" | "assistant"
@@ -22,6 +23,7 @@ export function ChatInterface() {
   const [tone, setTone] = useState("neutral")
   const [level, setLevel] = useState("B2")
   const [isLoading, setIsLoading] = useState(false)
+  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -40,6 +42,7 @@ export function ChatInterface() {
           tone,
           level,
           attachedTask: attachTask ? { prompt: "Sample prompt", essay: "Sample essay" } : null,
+          model: selectedModel,
         }),
       })
 
@@ -212,7 +215,34 @@ export function ChatInterface() {
             <CardHeader>
               <CardTitle className="text-base">Settings</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+          <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">AI Model</Label>
+                <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models.map((model) => (
+                      <SelectItem key={model.value} value={model.value}>
+                        <div className="flex flex-col">
+                          <span>{model.label}</span>
+                          {model.description && (
+                            <span className="text-xs text-muted-foreground">{model.description}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isLoadingModels && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...
+                  </p>
+                )}
+                {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-sm">Tone</Label>
                 <Select value={tone} onValueChange={setTone}>

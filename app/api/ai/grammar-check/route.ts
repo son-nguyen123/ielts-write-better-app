@@ -1,5 +1,6 @@
 import { generateObject } from "ai"
 import { z } from "zod"
+import { ensureGeminiApiKey, resolveModel } from "@/lib/ai"
 
 export const maxDuration = 30
 
@@ -17,14 +18,16 @@ const grammarSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json()
+    const { text, model } = await req.json()
+
+    ensureGeminiApiKey()
 
     if (!text) {
       return Response.json({ error: "Text is required" }, { status: 400 })
     }
 
     const { object } = await generateObject({
-      model: "google/gemini-2.5-flash-image",
+      model: resolveModel(model),
       schema: grammarSchema,
       prompt: `Check the following text for grammar, spelling, and style issues suitable for IELTS writing:
 
@@ -44,6 +47,7 @@ Focus on: subject-verb agreement, tense consistency, article usage, prepositions
     return Response.json({ issues: object.issues })
   } catch (error) {
     console.error("[v0] Error checking grammar:", error)
-    return Response.json({ error: "Failed to check grammar" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to check grammar"
+    return Response.json({ error: message }, { status: 500 })
   }
 }
