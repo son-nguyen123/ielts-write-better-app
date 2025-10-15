@@ -1,11 +1,26 @@
-import { convertToModelMessages, streamText, type UIMessage } from "ai"
+import { streamText, type CoreMessage } from "ai"
 import { ensureGeminiApiKey, resolveModel } from "@/lib/ai"
 
 export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {
-    const { messages, tone, level, attachedTask, model } = await req.json()
+    const body = await req.json()
+    const rawMessages = Array.isArray(body?.messages) ? body.messages : []
+    const tone = typeof body?.tone === "string" ? body.tone : undefined
+    const level = typeof body?.level === "string" ? body.level : undefined
+    const attachedTask = body?.attachedTask
+    const model = body?.model
+
+    const normalizedMessages: CoreMessage[] = rawMessages
+      .filter(
+        (message): message is { role: "user" | "assistant"; content: string } =>
+          !!message &&
+          (message.role === "user" || message.role === "assistant") &&
+          typeof message.content === "string" &&
+          message.content.trim().length > 0,
+      )
+      .map((message) => ({ role: message.role, content: message.content }))
 
     ensureGeminiApiKey()
 
@@ -22,11 +37,14 @@ Student Level: ${level || "B2"}`
       systemPrompt += `\n\nAttached Task Context:\nPrompt: ${attachedTask.prompt}\nEssay: ${attachedTask.essay}`
     }
 
-    const prompt = convertToModelMessages([{ role: "system", content: systemPrompt } as UIMessage, ...messages])
+    const conversation: CoreMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...normalizedMessages,
+    ]
 
     const result = streamText({
       model: resolveModel(model),
-      prompt,
+      messages: conversation,
       temperature: 0.7,
       maxOutputTokens: 2000,
     })
