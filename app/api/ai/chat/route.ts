@@ -6,7 +6,7 @@ export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {
-    const { messages, tone, level, attachedTask } = await req.json()
+    const { messages, tone, level, attachedTask, modelId } = await req.json()
 
     let systemPrompt = `You are an expert IELTS writing tutor. Help students improve their writing by:
 - Analyzing essays using TR/CC/LR/GRA criteria
@@ -24,7 +24,7 @@ Student Level: ${level || "B2"}`
     const prompt = convertToModelMessages([{ role: "system", content: systemPrompt } as UIMessage, ...messages])
 
     const result = streamText({
-      model: getGoogleModel(),
+      model: getGoogleModel(modelId ?? "gemini-2.0-flash"),
       prompt,
       temperature: 0.7,
       maxOutputTokens: 2000,

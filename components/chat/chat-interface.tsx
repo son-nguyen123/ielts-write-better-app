@@ -27,6 +27,7 @@ export function ChatInterface() {
   const [tone, setTone] = useState("neutral")
   const [level, setLevel] = useState("B2")
   const [isLoading, setIsLoading] = useState(false)
+  const [modelId, setModelId] = useState("gemini-2.0-flash")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export function ChatInterface() {
           messages: [...messages, userMessage],
           tone,
           level,
+          modelId,
           attachedTask: attachTask ? { prompt: "Sample prompt", essay: "Sample essay" } : null,
         }),
       })
@@ -256,6 +258,20 @@ export function ChatInterface() {
               <CardTitle className="text-base">Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Model</Label>
+                <Select value={modelId} onValueChange={setModelId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                    <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                    <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-sm">Tone</Label>
                 <Select value={tone} onValueChange={setTone}>
