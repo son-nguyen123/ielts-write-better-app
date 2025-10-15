@@ -10,8 +10,50 @@ import {
   orderBy,
   setDoc,
   Timestamp,
+  onSnapshot,
+  type Unsubscribe,
 } from "firebase/firestore"
 import { db } from "./firebase"
+
+export interface ChatMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export async function addChatMessage(
+  userId: string,
+  message: Pick<ChatMessage, "role" | "content">
+) {
+  const messagesRef = collection(db, "users", userId, "chatMessages")
+  const docRef = await addDoc(messagesRef, {
+    ...message,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  })
+  return docRef.id
+}
+
+export function listenToChatMessages(
+  userId: string,
+  callback: (messages: ChatMessage[]) => void
+): Unsubscribe {
+  const messagesRef = collection(db, "users", userId, "chatMessages")
+  const q = query(messagesRef, orderBy("createdAt", "asc"))
+
+  return onSnapshot(q, (snapshot) => {
+    const messages = snapshot.docs.map((docSnapshot) => {
+      const data = docSnapshot.data() as Omit<ChatMessage, "id"> & { id?: string }
+      return {
+        id: docSnapshot.id,
+        ...data,
+      } satisfies ChatMessage
+    })
+    callback(messages)
+  })
+}
 
 // Tasks
 export async function createTask(userId: string, taskData: any) {

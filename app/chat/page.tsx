@@ -5,7 +5,7 @@ import { ChatInterface } from "@/components/chat/chat-interface"
 export default function ChatPage() {
   return (
     <div className="min-h-screen">
-      <TopNav isSignedIn userName="Alex Chen" userEmail="alex@example.com" />
+      <TopNav />
       <SecondaryNav />
 
       <div className="container mx-auto px-4 py-8">

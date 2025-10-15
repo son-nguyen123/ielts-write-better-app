@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -9,29 +9,65 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Send, Bot, User } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
+import { addChatMessage, listenToChatMessages } from "@/lib/firebase-firestore"
+import { useToast } from "@/hooks/use-toast"
 
 interface Message {
+  id?: string
   role: "user" | "assistant"
   content: string
 }
 
 export function ChatInterface() {
+  const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [attachTask, setAttachTask] = useState(false)
   const [tone, setTone] = useState("neutral")
   const [level, setLevel] = useState("B2")
   const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (!user) {
+      setMessages([])
+      return
+    }
+
+    const unsubscribe = listenToChatMessages(user.uid, (chatMessages) => {
+      setMessages(
+        chatMessages.map(({ id, role, content }) => ({
+          id,
+          role,
+          content,
+        }))
+      )
+    })
+
+    return () => unsubscribe()
+  }, [user])
 
   const handleSend = async () => {
     if (!input.trim()) return
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save and continue your chat history.",
+        variant: "destructive",
+      })
+      return
+    }
 
-    const userMessage: Message = { role: "user", content: input }
+    const trimmedInput = input.trim()
+    const userMessage: Message = { role: "user", content: trimmedInput }
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
 
     try {
+      await addChatMessage(user.uid, userMessage)
+
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,12 +108,17 @@ export function ChatInterface() {
           }
         }
       }
+
+      if (assistantMessage.trim()) {
+        await addChatMessage(user.uid, { role: "assistant", content: assistantMessage.trim() })
+      }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
-      ])
+      const errorMessage = "Sorry, I encountered an error. Please try again."
+      setMessages((prev) => [...prev, { role: "assistant", content: errorMessage }])
+      if (user) {
+        await addChatMessage(user.uid, { role: "assistant", content: errorMessage })
+      }
     } finally {
       setIsLoading(false)
     }
@@ -114,14 +155,15 @@ export function ChatInterface() {
                     </div>
                     <h3 className="text-lg font-semibold mb-2">Hi! I'm your IELTS Writing Assistant</h3>
                     <p className="text-sm text-muted-foreground max-w-md">
-                      I can analyze your draft by TR/CC/LR/GRA or help paraphrase sentences. Ask me anything about IELTS
-                      writing!
+                      {user
+                        ? "I can analyze your draft by TR/CC/LR/GRA or help paraphrase sentences. Ask me anything about IELTS writing!"
+                        : "Sign in to start chatting and keep your conversation history synced across devices."}
                     </p>
                   </div>
                 ) : (
                   messages.map((message, index) => (
                     <div
-                      key={index}
+                      key={message.id ?? index}
                       className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
                       {message.role === "assistant" && (
@@ -168,9 +210,10 @@ export function ChatInterface() {
                   onKeyDown={handleKeyDown}
                   placeholder="E.g., 'Rewrite my introduction to better address TR' or 'How can I improve my vocabulary?'"
                   className="min-h-[100px]"
+                  disabled={!user}
                 />
                 <div className="flex gap-2">
-                  <Button onClick={handleSend} disabled={!input.trim() || isLoading} className="flex-1">
+                  <Button onClick={handleSend} disabled={!input.trim() || isLoading || !user} className="flex-1">
                     <Send className="mr-2 h-4 w-4" />
                     Send
                   </Button>
