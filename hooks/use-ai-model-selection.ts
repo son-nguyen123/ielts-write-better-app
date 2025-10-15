@@ -27,6 +27,7 @@ export function useAiModelSelection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -36,6 +37,7 @@ export function useAiModelSelection() {
     if (stored) {
       setSelectedModel(stored)
     }
+    setHydrated(true)
   }, [])
 
   useEffect(() => {
@@ -139,5 +141,6 @@ export function useAiModelSelection() {
     isLoading: loading,
     error,
     modelDetails: modelMap[selectedModel ?? DEFAULT_GOOGLE_MODEL] ?? null,
+    isReady: hydrated && !loading,
   }
 }

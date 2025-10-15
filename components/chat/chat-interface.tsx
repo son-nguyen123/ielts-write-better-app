@@ -23,7 +23,14 @@ export function ChatInterface() {
   const [tone, setTone] = useState("neutral")
   const [level, setLevel] = useState("B2")
   const [isLoading, setIsLoading] = useState(false)
-  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
+  const {
+    models,
+    selectedModel,
+    setSelectedModel,
+    isLoading: isLoadingModels,
+    error: modelError,
+    isReady: isModelReady,
+  } = useAiModelSelection()
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -350,23 +357,27 @@ export function ChatInterface() {
           <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm">AI Model</Label>
-                <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
-                        <div className="flex flex-col">
-                          <span>{model.label}</span>
-                          {model.description && (
-                            <span className="text-xs text-muted-foreground">{model.description}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isModelReady ? (
+                  <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((model) => (
+                        <SelectItem key={model.value} value={model.value}>
+                          <div className="flex flex-col">
+                            <span>{model.label}</span>
+                            {model.description && (
+                              <span className="text-xs text-muted-foreground">{model.description}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="h-10 w-full animate-pulse rounded-md border border-border bg-muted" />
+                )}
                 {isLoadingModels && (
                   <p className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...

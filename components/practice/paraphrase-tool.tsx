@@ -17,7 +17,14 @@ export function ParaphraseTool() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [paraphrases, setParaphrases] = useState<any[]>([])
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
-  const { models, selectedModel, setSelectedModel, isLoading: isLoadingModels, error: modelError } = useAiModelSelection()
+  const {
+    models,
+    selectedModel,
+    setSelectedModel,
+    isLoading: isLoadingModels,
+    error: modelError,
+    isReady: isModelReady,
+  } = useAiModelSelection()
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -79,21 +86,25 @@ export function ParaphraseTool() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>AI Model</Label>
-              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
-                <SelectTrigger>
-                  <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {models.map((model) => (
-                    <SelectItem key={model.value} value={model.value}>
-                      <div className="flex flex-col">
-                        <span>{model.label}</span>
-                        {model.description && <span className="text-xs text-muted-foreground">{model.description}</span>}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isModelReady ? (
+                <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models.map((model) => (
+                      <SelectItem key={model.value} value={model.value}>
+                        <div className="flex flex-col">
+                          <span>{model.label}</span>
+                          {model.description && <span className="text-xs text-muted-foreground">{model.description}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 w-full animate-pulse rounded-md border border-border bg-muted" />
+              )}
               {isLoadingModels && (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" /> Fetching available models...
