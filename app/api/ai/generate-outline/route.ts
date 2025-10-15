@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     }
 
     const { object } = await generateObject({
-      model: getGoogleModel("gemini-2.5-flash-image"),
+      model: getGoogleModel(),
       schema: outlineSchema,
       prompt: `Create a detailed essay outline for an IELTS Task 2 essay targeting band ${targetBand || "7.0"}.
 

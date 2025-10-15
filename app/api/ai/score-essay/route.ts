@@ -69,7 +69,7 @@ Provide a comprehensive IELTS evaluation with:
 4. Action items for improvement`
 
     const { object } = await generateObject({
-      model: getGoogleModel("gemini-2.5-flash-image"),
+      model: getGoogleModel(),
       schema: feedbackSchema,
       messages: [
         { role: "system", content: systemPrompt },

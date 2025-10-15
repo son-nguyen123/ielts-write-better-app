@@ -1,6 +1,6 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-const DEFAULT_GOOGLE_MODEL = "gemini-2.5-flash-image"
+const DEFAULT_GOOGLE_MODEL = "gemini-2.0-flash"
 
 export function ensureGeminiApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY

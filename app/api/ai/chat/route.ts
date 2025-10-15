@@ -24,7 +24,7 @@ Student Level: ${level || "B2"}`
     const prompt = convertToModelMessages([{ role: "system", content: systemPrompt } as UIMessage, ...messages])
 
     const result = streamText({
-      model: getGoogleModel("gemini-2.5-flash-image"),
+      model: getGoogleModel(),
       prompt,
       temperature: 0.7,
       maxOutputTokens: 2000,

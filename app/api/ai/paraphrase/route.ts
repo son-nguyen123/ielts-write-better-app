@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     }
 
     const { object } = await generateObject({
-      model: getGoogleModel("gemini-2.5-flash-image"),
+      model: getGoogleModel(),
       schema: paraphraseSchema,
       prompt: `Paraphrase the following text in 5 different styles for IELTS writing:
 
