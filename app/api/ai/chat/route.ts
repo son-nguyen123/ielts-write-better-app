@@ -1,5 +1,7 @@
 import { convertToModelMessages, streamText, type UIMessage } from "ai"
 
+import { getGoogleModel } from "@/lib/ai"
+
 export const maxDuration = 30
 
 export async function POST(req: Request) {
@@ -22,7 +24,7 @@ Student Level: ${level || "B2"}`
     const prompt = convertToModelMessages([{ role: "system", content: systemPrompt } as UIMessage, ...messages])
 
     const result = streamText({
-      model: "google/gemini-2.5-flash-image",
+      model: getGoogleModel(),
       prompt,
       temperature: 0.7,
       maxOutputTokens: 2000,

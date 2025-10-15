@@ -1,4 +1,5 @@
 import { generateObject } from "ai"
+import { getGoogleModel } from "@/lib/ai"
 import { z } from "zod"
 
 export const maxDuration = 60
@@ -68,7 +69,7 @@ Provide a comprehensive IELTS evaluation with:
 4. Action items for improvement`
 
     const { object } = await generateObject({
-      model: "google/gemini-2.5-flash-image",
+      model: getGoogleModel(),
       schema: feedbackSchema,
       messages: [
         { role: "system", content: systemPrompt },

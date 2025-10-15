@@ -1,4 +1,5 @@
 import { generateObject } from "ai"
+import { getGoogleModel } from "@/lib/ai"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     const { object } = await generateObject({
-      model: "google/gemini-2.5-flash-image",
+      model: getGoogleModel(),
       schema: grammarSchema,
       prompt: `Check the following text for grammar, spelling, and style issues suitable for IELTS writing:
 
