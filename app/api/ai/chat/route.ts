@@ -33,6 +33,52 @@ Student Level: ${level || "B2"}`
     return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error("[v0] Error in chat:", error)
+
+    const statusFromError = extractStatusCode(error)
+
+    if (statusFromError === 401 || statusFromError === 403) {
+      return Response.json(
+        { error: "Gemini API key is invalid or lacks required permissions" },
+        { status: statusFromError },
+      )
+    }
+
+    if (error instanceof Error && error.message.includes("GEMINI_API_KEY is not set")) {
+      return Response.json({ error: "GEMINI_API_KEY is not configured" }, { status: 401 })
+    }
+
+    const message = error instanceof Error ? error.message.toLowerCase() : ""
+    if (message.includes("unauthorized") || message.includes("unauthenticated") || message.includes("401")) {
+      return Response.json({ error: "Gemini API key is invalid" }, { status: 401 })
+    }
+
+    if (message.includes("permission") || message.includes("forbidden") || message.includes("403")) {
+      return Response.json(
+        { error: "Gemini API key does not have access to the requested model" },
+        { status: 403 },
+      )
+    }
+
     return Response.json({ error: "Failed to process chat" }, { status: 500 })
   }
+}
+
+function extractStatusCode(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined
+  }
+
+  const withStatus = error as { status?: unknown; cause?: unknown }
+  if (typeof withStatus.status === "number") {
+    return withStatus.status
+  }
+
+  if (withStatus.cause && typeof withStatus.cause === "object") {
+    const causeWithStatus = withStatus.cause as { status?: unknown }
+    if (typeof causeWithStatus.status === "number") {
+      return causeWithStatus.status
+    }
+  }
+
+  return undefined
 }

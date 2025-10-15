@@ -1,10 +1,9 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-const DEFAULT_GOOGLE_MODEL = "gemini-2.0-flash"
-const FALLBACK_GEMINI_API_KEY = "AIzaSyAalMlE8AWdtfY2yoQd-bNwYPF07Q35C-k"
+const DEFAULT_GOOGLE_MODEL = "gemini-1.5-flash"
 
 export function ensureGeminiApiKey(): string {
-  const apiKey = process.env.GEMINI_API_KEY ?? FALLBACK_GEMINI_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not set")
   }
