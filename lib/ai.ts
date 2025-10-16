@@ -2,6 +2,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
 const DEFAULT_GOOGLE_MODEL = "gemini-2.0-flash"
 
+let googleClient: ReturnType<typeof createGoogleGenerativeAI> | undefined
+
 export function ensureGeminiApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
@@ -11,10 +13,16 @@ export function ensureGeminiApiKey(): string {
   return apiKey
 }
 
-const google = createGoogleGenerativeAI({
-  apiKey: ensureGeminiApiKey(),
-})
+function getGoogleClient() {
+  if (!googleClient) {
+    googleClient = createGoogleGenerativeAI({
+      apiKey: ensureGeminiApiKey(),
+    })
+  }
+
+  return googleClient
+}
 
 export function getGoogleModel(modelId?: string) {
-  return google(modelId ?? DEFAULT_GOOGLE_MODEL)
+  return getGoogleClient()(modelId ?? DEFAULT_GOOGLE_MODEL)
 }
