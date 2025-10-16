@@ -78,32 +78,47 @@ export function ChatInterface() {
         }),
       })
 
+      if (!response.ok) {
+        let errorMessage = `Request failed with status ${response.status}`
+        try {
+          const data = await response.json()
+          if (data?.error && typeof data.error === "string") {
+            errorMessage = data.error
+          }
+        } catch (jsonError) {
+          console.error("Failed to parse error response", jsonError)
+        }
+
+        throw new Error(errorMessage)
+      }
+
       const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("Chat response did not include a readable stream")
+      }
       const decoder = new TextDecoder()
       let assistantMessage = ""
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
 
-          const chunk = decoder.decode(value)
-          const lines = chunk.split("\n")
+        const chunk = decoder.decode(value)
+        const lines = chunk.split("\n")
 
-          for (const line of lines) {
-            if (line.startsWith("0:")) {
-              const text = line.slice(3, -1)
-              assistantMessage += text
-              setMessages((prev) => {
-                const newMessages = [...prev]
-                if (newMessages[newMessages.length - 1]?.role === "assistant") {
-                  newMessages[newMessages.length - 1].content = assistantMessage
-                } else {
-                  newMessages.push({ role: "assistant", content: assistantMessage })
-                }
-                return newMessages
-              })
-            }
+        for (const line of lines) {
+          if (line.startsWith("0:")) {
+            const text = line.slice(3, -1)
+            assistantMessage += text
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              if (newMessages[newMessages.length - 1]?.role === "assistant") {
+                newMessages[newMessages.length - 1].content = assistantMessage
+              } else {
+                newMessages.push({ role: "assistant", content: assistantMessage })
+              }
+              return newMessages
+            })
           }
         }
       }

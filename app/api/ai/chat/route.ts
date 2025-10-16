@@ -55,7 +55,7 @@ Essay: ${attachedTask?.essay ?? ""}`
     }
 
     // 5) Convert messages
-    const prompt = convertToModelMessages([
+    const modelMessages = convertToModelMessages([
       { role: "system", content: systemPrompt } as UIMessage,
       ...cleaned,
     ])
@@ -63,7 +63,7 @@ Essay: ${attachedTask?.essay ?? ""}`
     // 6) Gọi model (nên await để chắc result hợp lệ)
     const result = await streamText({
       model: getGoogleModel(typeof model === "string" && model.trim() ? model : undefined),
-      prompt,
+      messages: modelMessages,
       temperature: 0.7,
       maxOutputTokens: 2000,
     })
