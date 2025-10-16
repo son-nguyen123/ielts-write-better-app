@@ -1,4 +1,4 @@
-import { streamText } from "ai"
+import { streamText, consumeStream, convertToModelMessages } from "ai"
 import { NextResponse } from "next/server"
 import { getGoogleModel } from "@/lib/ai"
 
@@ -46,15 +46,20 @@ Prompt: ${attachedTask?.prompt ?? ""}
 Essay: ${attachedTask?.essay ?? ""}`
     }
 
-    const result = await streamText({
+    const prompt = convertToModelMessages(normalizedMessages)
+
+    const result = streamText({
       model: getGoogleModel(typeof model === "string" && model.trim() ? model : undefined),
       system: systemPrompt,
-      messages: normalizedMessages,
+      prompt,
       temperature: 0.7,
       maxTokens: 2000,
+      abortSignal: req.signal,
     })
 
-    return result.toDataStreamResponse()
+    return result.toUIMessageStreamResponse({
+      consumeSseStream: consumeStream,
+    })
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
     return NextResponse.json({ error: err?.message ?? "Failed to process chat" }, { status: 500 })
