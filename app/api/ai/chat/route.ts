@@ -56,7 +56,9 @@ Essay: ${attachedTask?.essay ?? ""}`
         temperature: 0.7,
         maxOutputTokens: 2000,
       },
-      systemInstruction: systemPrompt,
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
     })
 
     const lastMessage = geminiMessages[geminiMessages.length - 1]
