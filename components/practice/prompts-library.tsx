@@ -9,6 +9,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Eye } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
+const MOCK_TEST_PREFILL_KEY = "mockTestPrefill"
+
+type MockTestPrefill = {
+  task1?: string
+  task2?: string
+}
+
 const prompts = [
   {
     id: "1",
@@ -98,6 +105,29 @@ export function PromptsLibrary() {
     router.push(`/tasks/new?promptId=${promptId}`)
   }
 
+  const handleAddToMockTest = (prompt: (typeof prompts)[number]) => {
+    const queryParam = prompt.type === "Task 1" ? "task1" : "task2"
+
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem(MOCK_TEST_PREFILL_KEY)
+        const parsed: MockTestPrefill = stored ? JSON.parse(stored) : {}
+
+        if (prompt.type === "Task 1") {
+          parsed.task1 = prompt.id
+        } else {
+          parsed.task2 = prompt.id
+        }
+
+        window.localStorage.setItem(MOCK_TEST_PREFILL_KEY, JSON.stringify(parsed))
+      } catch (error) {
+        console.error("[prompts-library] Failed to store mock test selection", error)
+      }
+    }
+
+    router.push(`/practice/mock-tests?${queryParam}=${prompt.id}`)
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -154,7 +184,7 @@ export function PromptsLibrary() {
                   </Badge>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -166,6 +196,14 @@ export function PromptsLibrary() {
                 </Button>
                 <Button size="sm" onClick={() => handleUsePrompt(prompt.id)} className="flex-1">
                   Use this prompt
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleAddToMockTest(prompt)}
+                  className="flex-1"
+                >
+                  Add to mock test
                 </Button>
               </div>
             </CardContent>
@@ -196,6 +234,15 @@ export function PromptsLibrary() {
               className="flex-1"
             >
               Use this prompt
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (previewPrompt) handleAddToMockTest(previewPrompt)
+              }}
+              className="flex-1"
+            >
+              Add to mock test
             </Button>
           </div>
         </DialogContent>
