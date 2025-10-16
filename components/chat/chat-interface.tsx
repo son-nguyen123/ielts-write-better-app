@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,13 +15,47 @@ interface Message {
   content: string
 }
 
+interface GeminiModelOption {
+  id: string
+  displayName: string
+  description?: string
+}
+
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [attachTask, setAttachTask] = useState(false)
   const [tone, setTone] = useState("neutral")
   const [level, setLevel] = useState("B2")
+  const [modelOptions, setModelOptions] = useState<GeminiModelOption[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>("")
+  const [modelError, setModelError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await fetch("/api/ai/models")
+
+        if (!response.ok) {
+          const { error } = await response.json().catch(() => ({ error: "" }))
+          throw new Error(error || "Failed to load Gemini models")
+        }
+
+        const data = await response.json()
+        const options: GeminiModelOption[] = data.models ?? []
+
+        setModelOptions(options)
+        setSelectedModel(data.defaultModelId ?? options[0]?.id ?? "")
+        setModelError(null)
+      } catch (error) {
+        console.error("Failed to load Gemini models", error)
+        setModelError(error instanceof Error ? error.message : "Failed to load Gemini models")
+      }
+    }
+
+    fetchModels()
+  }, [])
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -39,6 +73,7 @@ export function ChatInterface() {
           messages: [...messages, userMessage],
           tone,
           level,
+          model: selectedModel || undefined,
           attachedTask: attachTask ? { prompt: "Sample prompt", essay: "Sample essay" } : null,
         }),
       })
@@ -213,6 +248,29 @@ export function ChatInterface() {
               <CardTitle className="text-base">Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Gemini model</Label>
+                <Select
+                  value={selectedModel}
+                  onValueChange={setSelectedModel}
+                  disabled={modelOptions.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={modelError ?? "Select a model"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modelOptions.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {modelError && (
+                  <p className="text-xs text-destructive">{modelError}</p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-sm">Tone</Label>
                 <Select value={tone} onValueChange={setTone}>

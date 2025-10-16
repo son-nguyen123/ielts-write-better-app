@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
     }
 
-    const { messages, tone, level, attachedTask } = json
+    const { messages, tone, level, attachedTask, model } = json
 
     // 2) Validate tối thiểu cho messages
     if (!Array.isArray(messages)) {
@@ -62,7 +62,7 @@ Essay: ${attachedTask?.essay ?? ""}`
 
     // 6) Gọi model (nên await để chắc result hợp lệ)
     const result = await streamText({
-      model: getGoogleModel(),
+      model: getGoogleModel(typeof model === "string" && model.trim() ? model : undefined),
       prompt,
       temperature: 0.7,
       maxOutputTokens: 2000,
