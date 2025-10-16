@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -11,51 +11,71 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Search, MoreVertical, Copy, Trash2 } from "lucide-react"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FileText } from "lucide-react"
-
-const mockTasks = [
-  {
-    id: "1",
-    title: "Technology and Society Essay",
-    type: "Task 2",
-    status: "Scored",
-    score: 7.0,
-    updatedAt: "2 hours ago",
-  },
-  {
-    id: "2",
-    title: "Climate Change Bar Chart",
-    type: "Task 1",
-    status: "Draft",
-    score: null,
-    updatedAt: "1 day ago",
-  },
-  {
-    id: "3",
-    title: "Education System Comparison",
-    type: "Task 2",
-    status: "Scored",
-    score: 6.5,
-    updatedAt: "3 days ago",
-  },
-  {
-    id: "4",
-    title: "Population Growth Line Graph",
-    type: "Task 1",
-    status: "Submitted",
-    score: null,
-    updatedAt: "5 days ago",
-  },
-]
+import { formatDistanceToNow } from "date-fns"
+import { useAuth } from "@/components/auth/auth-provider"
+import { getTasks } from "@/lib/firebase-firestore"
 
 export function TasksTable() {
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { user, loading: authLoading } = useAuth()
 
-  const filteredTasks = mockTasks.filter((task) => {
-    const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase())
-    const matchesType = typeFilter === "all" || task.type === typeFilter
-    const matchesStatus = statusFilter === "all" || task.status.toLowerCase() === statusFilter.toLowerCase()
+  useEffect(() => {
+    let isMounted = true
+
+    if (authLoading) {
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const loadTasks = async () => {
+      if (!user) {
+        if (isMounted) {
+          setTasks([])
+          setLoading(false)
+        }
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const fetchedTasks = await getTasks(user.uid)
+        if (isMounted) {
+          setTasks(fetchedTasks)
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError("We couldn't load your tasks. Please try again.")
+          console.error("Failed to load tasks", err)
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadTasks()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user, authLoading])
+
+  const filteredTasks = tasks.filter((task) => {
+    const title = (task.title || task.promptTitle || "Untitled Task").toLowerCase()
+    const matchesSearch = title.includes(search.toLowerCase())
+    const matchesType =
+      typeFilter === "all" || (task.type || task.promptType || "").toLowerCase() === typeFilter.toLowerCase()
+    const matchesStatus =
+      statusFilter === "all" || (task.status || "").toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesType && matchesStatus
   })
 
@@ -120,7 +140,11 @@ export function TasksTable() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredTasks.length === 0 ? (
+          {loading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">Loading your tasks...</div>
+          ) : error ? (
+            <div className="py-10 text-center text-sm text-destructive">{error}</div>
+          ) : filteredTasks.length === 0 ? (
             <EmptyState
               icon={FileText}
               title="No tasks found"
@@ -144,53 +168,70 @@ export function TasksTable() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTasks.map((task) => (
-                    <tr key={task.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                      <td className="py-3 px-4">
-                        <Link
-                          href={`/tasks/${task.id}`}
-                          className="text-sm font-medium hover:text-primary transition-colors"
-                        >
-                          {task.title}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm text-muted-foreground">{task.type}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        {task.score ? (
-                          <span className="text-sm font-semibold text-primary">{task.score}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm text-muted-foreground">{task.updatedAt}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Duplicate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredTasks.map((task) => {
+                    const title = task.title || task.promptTitle || "Untitled Task"
+                    const type = task.type || task.promptType || "Unknown"
+                    const status = (task.status || "draft") as string
+                    const score = task.score ?? task.overallScore ?? null
+                    const updatedAt = task.updatedAt
+                      ? formatDistanceToNow(
+                          task.updatedAt.toDate
+                            ? task.updatedAt.toDate()
+                            : new Date(task.updatedAt),
+                          { addSuffix: true },
+                        )
+                      : "-"
+
+                    return (
+                      <tr key={task.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                        <td className="py-3 px-4">
+                          <Link
+                            href={`/tasks/${task.id}`}
+                            className="text-sm font-medium hover:text-primary transition-colors"
+                          >
+                            {title}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-muted-foreground">{type}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant={getStatusVariant(status)}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          {score !== null && score !== undefined ? (
+                            <span className="text-sm font-semibold text-primary">{score}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-muted-foreground">{updatedAt}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
