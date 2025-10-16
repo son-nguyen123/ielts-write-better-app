@@ -1,4 +1,4 @@
-import { streamText, consumeStream } from "ai"
+import { streamText } from "ai"
 import { NextResponse } from "next/server"
 import { getGoogleModel } from "@/lib/ai"
 
@@ -54,9 +54,7 @@ Essay: ${attachedTask?.essay ?? ""}`
       abortSignal: req.signal,
     })
 
-    return result.toUIMessageStreamResponse({
-      consumeSseStream: consumeStream,
-    })
+    return result.toTextStreamResponse()
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
     return NextResponse.json({ error: err?.message ?? "Failed to process chat" }, { status: 500 })

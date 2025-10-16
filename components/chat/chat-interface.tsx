@@ -99,28 +99,22 @@ export function ChatInterface() {
       const decoder = new TextDecoder()
       let assistantMessage = ""
 
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value)
-        const lines = chunk.split("\n")
+        const chunk = decoder.decode(value, { stream: true })
+        assistantMessage += chunk
 
-        for (const line of lines) {
-          if (line.startsWith("0:")) {
-            const text = line.slice(3, -1)
-            assistantMessage += text
-            setMessages((prev) => {
-              const newMessages = [...prev]
-              if (newMessages[newMessages.length - 1]?.role === "assistant") {
-                newMessages[newMessages.length - 1].content = assistantMessage
-              } else {
-                newMessages.push({ role: "assistant", content: assistantMessage })
-              }
-              return newMessages
-            })
+        setMessages((prev) => {
+          const newMessages = [...prev]
+          if (newMessages[newMessages.length - 1]?.role === "assistant") {
+            newMessages[newMessages.length - 1].content = assistantMessage
           }
-        }
+          return newMessages
+        })
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
@@ -265,11 +259,7 @@ export function ChatInterface() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm">Gemini model</Label>
-                <Select
-                  value={selectedModel}
-                  onValueChange={setSelectedModel}
-                  disabled={modelOptions.length === 0}
-                >
+                <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelOptions.length === 0}>
                   <SelectTrigger>
                     <SelectValue placeholder={modelError ?? "Select a model"} />
                   </SelectTrigger>
@@ -281,9 +271,7 @@ export function ChatInterface() {
                     ))}
                   </SelectContent>
                 </Select>
-                {modelError && (
-                  <p className="text-xs text-destructive">{modelError}</p>
-                )}
+                {modelError && <p className="text-xs text-destructive">{modelError}</p>}
               </div>
 
               <div className="space-y-2">
