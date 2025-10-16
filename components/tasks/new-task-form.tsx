@@ -17,6 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useAuth } from "@/components/auth/auth-provider"
+import { createTask, updateTask } from "@/lib/firebase-firestore"
 
 const task1Prompts = [
   { id: "1", title: "Bar Chart: Global CO2 Emissions", description: "Describe changes in emissions from 2000-2020" },
@@ -37,6 +39,7 @@ const task2Prompts = [
 export function NewTaskForm() {
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth()
   const [taskType, setTaskType] = useState<string>("Task 2")
   const [selectedPrompt, setSelectedPrompt] = useState<string>("")
   const [customPrompt, setCustomPrompt] = useState("")
@@ -44,24 +47,109 @@ export function NewTaskForm() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [taskId, setTaskId] = useState<string | null>(null)
 
   const prompts = taskType === "Task 1" ? task1Prompts : task2Prompts
   const wordCount = response.trim().split(/\s+/).filter(Boolean).length
   const minWords = taskType === "Task 1" ? 150 : 250
 
-  const handleSaveDraft = () => {
+  const selectedPromptDetails = prompts.find((prompt) => prompt.id === selectedPrompt)
+  const resolvedPromptText = customPrompt.trim() || selectedPromptDetails?.description || ""
+  const resolvedPromptTitle =
+    selectedPromptDetails?.title || (resolvedPromptText ? resolvedPromptText.split("\n")[0].slice(0, 120) : "Custom Prompt")
+
+  const ensureUserAndPrompt = (action: "save" | "submit") => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save your work.",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!resolvedPromptText) {
+      toast({
+        title: "Choose a prompt",
+        description: "Select one of the suggested prompts or enter your own before continuing.",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!response.trim()) {
+      toast({
+        title: action === "save" ? "Nothing to save" : "Response required",
+        description: "Write your essay response before continuing.",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    return true
+  }
+
+  const handleSaveDraft = async () => {
+    if (!ensureUserAndPrompt("save")) {
+      return
+    }
+
+    const userId = user?.uid
+    if (!userId) {
+      return
+    }
+
     setIsSaving(true)
-    setTimeout(() => {
-      setIsSaving(false)
+    const payload = {
+      type: taskType,
+      prompt: resolvedPromptText,
+      promptId: selectedPromptDetails?.id ?? null,
+      promptTitle: resolvedPromptTitle,
+      response,
+      wordCount,
+      status: "draft" as const,
+    }
+
+    try {
+      let savedTaskId = taskId
+
+      if (taskId) {
+        await updateTask(userId, taskId, payload)
+      } else {
+        savedTaskId = await createTask(userId, payload)
+        setTaskId(savedTaskId)
+      }
+
       toast({
         title: "Draft saved",
-        description: "Your task has been saved as a draft.",
+        description: "Your task has been saved to your workspace.",
       })
-      router.push("/tasks")
-    }, 1000)
+
+      if (savedTaskId) {
+        router.push(`/tasks/${savedTaskId}`)
+      }
+    } catch (error) {
+      console.error("[v0] Error saving draft:", error)
+      toast({
+        title: "Error saving draft",
+        description: "We couldn't save your draft. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleSubmit = () => {
+    if (!resolvedPromptText) {
+      toast({
+        title: "Choose a prompt",
+        description: "Select one of the suggested prompts or enter your own before submitting.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (wordCount < minWords) {
       toast({
         title: "Word count too low",
@@ -74,6 +162,17 @@ export function NewTaskForm() {
   }
 
   const confirmSubmit = async () => {
+    if (!ensureUserAndPrompt("submit")) {
+      setShowConfirmDialog(false)
+      return
+    }
+
+    const userId = user?.uid
+    if (!userId) {
+      setShowConfirmDialog(false)
+      return
+    }
+
     setShowConfirmDialog(false)
     setIsSubmitting(true)
 
@@ -84,20 +183,60 @@ export function NewTaskForm() {
         body: JSON.stringify({
           essay: response,
           taskType,
-          prompt: customPrompt,
+          prompt: resolvedPromptText,
         }),
       })
 
       const scoringData = await scoringResponse.json()
 
-      // TODO: Save to Firestore with the feedback
-      console.log("[v0] Essay scored:", scoringData)
+      if (!scoringResponse.ok) {
+        throw new Error(scoringData?.error || "Failed to score essay")
+      }
+
+      const feedback = scoringData.feedback
+
+      const payload = {
+        type: taskType,
+        prompt: resolvedPromptText,
+        promptId: selectedPromptDetails?.id ?? null,
+        promptTitle: resolvedPromptTitle,
+        response,
+        wordCount,
+        status: "scored" as const,
+        feedback,
+        summary: feedback?.summary ?? "",
+        actionItems: feedback?.actionItems ?? [],
+        criteria: feedback?.criteria ?? null,
+        score: feedback?.overallBand ?? null,
+        overallScore: feedback?.overallBand ?? null,
+      }
+
+      let savedTaskId = taskId
+
+      try {
+        if (taskId) {
+          await updateTask(userId, taskId, payload)
+        } else {
+          savedTaskId = await createTask(userId, payload)
+          setTaskId(savedTaskId)
+        }
+      } catch (firestoreError) {
+        console.error("[v0] Error saving scored task:", firestoreError)
+        toast({
+          title: "Error saving task",
+          description: "We scored your essay but couldn't save it. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
 
       toast({
         title: "Task submitted",
         description: "Your task has been scored successfully.",
       })
-      router.push("/tasks/1")
+      if (savedTaskId) {
+        router.push(`/tasks/${savedTaskId}`)
+      }
     } catch (error) {
       console.error("[v0] Error submitting task:", error)
       toast({
