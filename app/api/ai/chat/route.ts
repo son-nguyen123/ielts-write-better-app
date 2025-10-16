@@ -1,4 +1,4 @@
-import { streamText, consumeStream, convertToModelMessages } from "ai"
+import { streamText, consumeStream } from "ai"
 import { NextResponse } from "next/server"
 import { getGoogleModel } from "@/lib/ai"
 
@@ -17,7 +17,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "`messages` must be an array" }, { status: 400 })
     }
 
-    // Normalize messages to standard format without custom properties
     const normalizedMessages = messages.filter(Boolean).map((m: any) => ({
       id: m.id ?? crypto.randomUUID(),
       role: m.role === "user" || m.role === "assistant" ? m.role : "user",
@@ -46,12 +45,10 @@ Prompt: ${attachedTask?.prompt ?? ""}
 Essay: ${attachedTask?.essay ?? ""}`
     }
 
-    const prompt = convertToModelMessages(normalizedMessages)
-
     const result = streamText({
       model: getGoogleModel(typeof model === "string" && model.trim() ? model : undefined),
       system: systemPrompt,
-      prompt,
+      messages: normalizedMessages,
       temperature: 0.7,
       maxTokens: 2000,
       abortSignal: req.signal,
