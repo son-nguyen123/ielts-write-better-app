@@ -1,5 +1,4 @@
-import { generateObject } from "ai"
-import { getGoogleModel } from "@/lib/ai"
+import { getGeminiModel } from "@/lib/gemini-native"
 import { z } from "zod"
 
 export const maxDuration = 60
@@ -48,6 +47,8 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    const model = getGeminiModel("gemini-2.0-flash-exp")
+
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 
 Task Response (TR): How well the essay addresses the task
@@ -55,32 +56,68 @@ Coherence & Cohesion (CC): Organization and logical flow
 Lexical Resource (LR): Vocabulary range and accuracy
 Grammatical Range & Accuracy (GRA): Grammar complexity and correctness
 
-Provide detailed, actionable feedback with specific examples from the text.`
+Provide detailed, actionable feedback with specific examples from the text.
+
+Return your response as a JSON object with this exact structure:
+{
+  "overallBand": number (0-9, can use .5 increments),
+  "summary": "brief overall assessment",
+  "criteria": {
+    "TR": {
+      "score": number (0-9),
+      "strengths": ["strength 1", "strength 2"],
+      "issues": ["issue 1", "issue 2"],
+      "suggestions": ["suggestion 1", "suggestion 2"],
+      "examples": ["example 1", "example 2"]
+    },
+    "CC": { same structure },
+    "LR": { same structure },
+    "GRA": { same structure }
+  },
+  "actionItems": ["action 1", "action 2", "action 3"]
+}`
 
     const userPrompt = `Prompt: ${prompt}
 
 Essay:
 ${essay}
 
-Provide a comprehensive IELTS evaluation with:
-1. Overall band score (0-9, can use .5 increments)
-2. Individual scores for TR, CC, LR, and GRA
-3. For each criterion: strengths, issues, specific suggestions, and examples
-4. Action items for improvement`
+Provide a comprehensive IELTS evaluation following the JSON structure specified.`
 
-    const { object } = await generateObject({
-      model: getGoogleModel(),
-      schema: feedbackSchema,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+        },
       ],
-      temperature: 0.3,
+      generationConfig: {
+        temperature: 0.3,
+        responseMimeType: "application/json",
+      },
     })
 
-    return Response.json({ feedback: object })
+    const response = result.response
+    const text = response.text()
+
+    console.log("[v0] Raw Gemini response:", text)
+
+    // Parse and validate the JSON response
+    let parsedResponse
+    try {
+      parsedResponse = JSON.parse(text)
+    } catch (parseError) {
+      console.error("[v0] Failed to parse JSON:", parseError)
+      console.error("[v0] Response text:", text)
+      throw new Error("Invalid JSON response from AI")
+    }
+
+    // Validate with Zod schema
+    const validatedFeedback = feedbackSchema.parse(parsedResponse)
+
+    return Response.json({ feedback: validatedFeedback })
   } catch (error) {
     console.error("[v0] Error scoring essay:", error)
-    return Response.json({ error: "Failed to score essay" }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : "Failed to score essay" }, { status: 500 })
   }
 }
