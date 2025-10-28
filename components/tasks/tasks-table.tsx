@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -8,56 +9,96 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, MoreVertical, Copy, Trash2 } from "lucide-react"
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Copy,
+  Trash2,
+  Loader2,
+  AlertCircle,
+  FileText,
+} from "lucide-react"
 import { EmptyState } from "@/components/ui/empty-state"
-import { FileText } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
+import { subscribeToTasks } from "@/lib/firebase-firestore"
+import type { TaskDocument } from "@/types/tasks"
 
-const mockTasks = [
-  {
-    id: "1",
-    title: "Technology and Society Essay",
-    type: "Task 2",
-    status: "Scored",
-    score: 7.0,
-    updatedAt: "2 hours ago",
-  },
-  {
-    id: "2",
-    title: "Climate Change Bar Chart",
-    type: "Task 1",
-    status: "Draft",
-    score: null,
-    updatedAt: "1 day ago",
-  },
-  {
-    id: "3",
-    title: "Education System Comparison",
-    type: "Task 2",
-    status: "Scored",
-    score: 6.5,
-    updatedAt: "3 days ago",
-  },
-  {
-    id: "4",
-    title: "Population Growth Line Graph",
-    type: "Task 1",
-    status: "Submitted",
-    score: null,
-    updatedAt: "5 days ago",
-  },
-]
+const formatTimestamp = (value?: TaskDocument["updatedAt"]) => {
+  if (!value) {
+    return "—"
+  }
+
+  try {
+    const date = "toDate" in value ? value.toDate() : new Date(value as unknown as string)
+    return new Intl.DateTimeFormat("en", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date)
+  } catch (error) {
+    console.error("[v0] Failed to format timestamp:", error)
+    return "—"
+  }
+}
 
 export function TasksTable() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
+  const [tasks, setTasks] = useState<TaskDocument[]>([])
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [retryKey, setRetryKey] = useState(0)
 
-  const filteredTasks = mockTasks.filter((task) => {
-    const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase())
-    const matchesType = typeFilter === "all" || task.type === typeFilter
-    const matchesStatus = statusFilter === "all" || task.status.toLowerCase() === statusFilter.toLowerCase()
-    return matchesSearch && matchesType && matchesStatus
-  })
+  useEffect(() => {
+    if (authLoading) {
+      return
+    }
+
+    if (!user) {
+      setTasks([])
+      setIsLoading(false)
+      setLoadError(null)
+      return
+    }
+
+    setIsLoading(true)
+    setLoadError(null)
+
+    const unsubscribe = subscribeToTasks(
+      user.uid,
+      (data) => {
+        setTasks(data ?? [])
+        setIsLoading(false)
+        setLoadError(null)
+      },
+      (error) => {
+        console.error("[v0] Task subscription error:", error)
+        setTasks([])
+        setIsLoading(false)
+        setLoadError("We couldn't load your tasks. Please try again.")
+      },
+    )
+
+    return () => {
+      unsubscribe()
+    }
+  }, [authLoading, retryKey, user])
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const title = task.title || task.prompt || ""
+      const matchesSearch = title.toLowerCase().includes(search.toLowerCase())
+      const matchesType = typeFilter === "all" || task.taskType === typeFilter
+      const matchesStatus =
+        statusFilter === "all" || task.status?.toLowerCase() === statusFilter.toLowerCase()
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [search, statusFilter, tasks, typeFilter])
 
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
@@ -120,14 +161,32 @@ export function TasksTable() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredTasks.length === 0 ? (
+          {loadError ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Tasks unavailable"
+              description={loadError}
+              action={{
+                label: "Try again",
+                onClick: () => setRetryKey((prev) => prev + 1),
+              }}
+            />
+          ) : isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredTasks.length === 0 ? (
             <EmptyState
               icon={FileText}
-              title="No tasks found"
-              description="Try adjusting your filters or create a new task to get started."
+              title={user ? "No tasks found" : "Sign in to see your tasks"}
+              description={
+                user
+                  ? "Try adjusting your filters or create a new task to get started."
+                  : "Create an account or sign in to start tracking your IELTS practice essays."
+              }
               action={{
-                label: "Create New Task",
-                onClick: () => (window.location.href = "/tasks/new"),
+                label: user ? "Create New Task" : "Go to Dashboard",
+                onClick: () => router.push(user ? "/tasks/new" : "/"),
               }}
             />
           ) : (
@@ -151,24 +210,32 @@ export function TasksTable() {
                           href={`/tasks/${task.id}`}
                           className="text-sm font-medium hover:text-primary transition-colors"
                         >
-                          {task.title}
+                          {task.title || task.prompt || "Untitled Task"}
                         </Link>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-sm text-muted-foreground">{task.type}</span>
+                        <span className="text-sm text-muted-foreground">{task.taskType || "—"}</span>
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
+                        <Badge variant={getStatusVariant(task.status || "draft")}>{
+                          task.status ? task.status.charAt(0).toUpperCase() + task.status.slice(1) : "Draft"
+                        }</Badge>
                       </td>
                       <td className="py-3 px-4">
-                        {task.score ? (
-                          <span className="text-sm font-semibold text-primary">{task.score}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
+                        {(() => {
+                          const band = task.overallBand ?? task.feedback?.overallBand
+                          if (typeof band === "number") {
+                            return (
+                              <span className="text-sm font-semibold text-primary">
+                                {band.toFixed(1)}
+                              </span>
+                            )
+                          }
+                          return <span className="text-sm text-muted-foreground">-</span>
+                        })()}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-sm text-muted-foreground">{task.updatedAt}</span>
+                        <span className="text-sm text-muted-foreground">{formatTimestamp(task.updatedAt)}</span>
                       </td>
                       <td className="py-3 px-4">
                         <DropdownMenu>

@@ -10,7 +10,9 @@ import {
   orderBy,
   setDoc,
   Timestamp,
+  onSnapshot,
 } from "firebase/firestore"
+import type { TaskDocument } from "@/types/tasks"
 import { db } from "./firebase"
 
 // Tasks
@@ -35,6 +37,32 @@ export async function getTask(userId: string, taskId: string) {
   const taskRef = doc(db, "users", userId, "tasks", taskId)
   const snapshot = await getDoc(taskRef)
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
+}
+
+export function subscribeToTasks(
+  userId: string,
+  onUpdate: (tasks: TaskDocument[]) => void,
+  onError?: (error: Error) => void,
+) {
+  const tasksRef = collection(db, "users", userId, "tasks")
+  const q = query(tasksRef, orderBy("updatedAt", "desc"))
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const documents = snapshot.docs.map((docSnapshot) => ({
+        id: docSnapshot.id,
+        ...docSnapshot.data(),
+      })) as TaskDocument[]
+      onUpdate(documents)
+    },
+    (error) => {
+      console.error("[v0] Failed to subscribe to tasks:", error)
+      if (onError) {
+        onError(error)
+      }
+    },
+  )
 }
 
 export async function updateTask(userId: string, taskId: string, updates: any) {
