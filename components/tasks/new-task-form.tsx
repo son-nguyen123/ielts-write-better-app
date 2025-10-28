@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Save, Send } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
+import { createTask } from "@/lib/firebase-firestore"
+import type { TaskFeedback } from "@/types/tasks"
 import {
   Dialog,
   DialogContent,
@@ -37,6 +40,7 @@ const task2Prompts = [
 export function NewTaskForm() {
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth()
   const [taskType, setTaskType] = useState<string>("Task 2")
   const [selectedPrompt, setSelectedPrompt] = useState<string>("")
   const [customPrompt, setCustomPrompt] = useState("")
@@ -48,6 +52,13 @@ export function NewTaskForm() {
   const prompts = taskType === "Task 1" ? task1Prompts : task2Prompts
   const wordCount = response.trim().split(/\s+/).filter(Boolean).length
   const minWords = taskType === "Task 1" ? 150 : 250
+  const selectedPromptMeta = useMemo(
+    () => prompts.find((prompt) => prompt.id === selectedPrompt),
+    [prompts, selectedPrompt],
+  )
+  const resolvedPrompt = customPrompt.trim() || selectedPromptMeta?.description || ""
+  const resolvedTitle = selectedPromptMeta?.title ||
+    (resolvedPrompt ? `${taskType} - ${resolvedPrompt.slice(0, 50)}${resolvedPrompt.length > 50 ? "…" : ""}` : `${taskType} Submission`)
 
   const handleSaveDraft = () => {
     setIsSaving(true)
@@ -78,26 +89,58 @@ export function NewTaskForm() {
     setIsSubmitting(true)
 
     try {
+      if (!user) {
+        toast({
+          title: "Sign in required",
+          description: "Please sign in to submit your task for scoring.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const scoringResponse = await fetch("/api/ai/score-essay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           essay: response,
           taskType,
-          prompt: customPrompt,
+          prompt: resolvedPrompt,
         }),
       })
 
-      const scoringData = await scoringResponse.json()
+      const scoringData = await scoringResponse.json().catch(() => null)
 
-      // TODO: Save to Firestore with the feedback
-      console.log("[v0] Essay scored:", scoringData)
+      if (!scoringResponse.ok || !scoringData?.feedback) {
+        const errorMessage = scoringData?.error || "Failed to score essay. Please try again."
+        toast({
+          title: "Scoring failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return
+      }
+
+      const feedback: TaskFeedback = scoringData.feedback
+
+      const taskId = await createTask(user.uid, {
+        title: resolvedTitle,
+        prompt: resolvedPrompt,
+        promptId: selectedPrompt || null,
+        taskType,
+        response,
+        wordCount,
+        status: "scored",
+        overallBand: feedback.overallBand,
+        summary: feedback.summary,
+        feedback,
+        actionItems: feedback.actionItems,
+      })
 
       toast({
         title: "Task submitted",
         description: "Your task has been scored successfully.",
       })
-      router.push("/tasks/1")
+      router.push(`/tasks/${taskId}`)
     } catch (error) {
       console.error("[v0] Error submitting task:", error)
       toast({
