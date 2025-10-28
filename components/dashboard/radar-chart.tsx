@@ -1,5 +1,6 @@
 "use client"
 
+import type { CriterionKey } from "@/types/tasks"
 import {
   Radar,
   RadarChart as RechartsRadar,
@@ -9,14 +10,39 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
-const data = [
-  { criteria: "TR", current: 7.0, target: 7.5 },
-  { criteria: "CC", current: 7.5, target: 7.5 },
-  { criteria: "LR", current: 6.5, target: 7.5 },
-  { criteria: "GRA", current: 7.0, target: 7.5 },
-]
+interface RadarChartProps {
+  scores?: Partial<Record<CriterionKey, number>>
+  target?: number
+  isLoading?: boolean
+}
 
-export function RadarChart() {
+const CRITERIA_ORDER: CriterionKey[] = ["TR", "CC", "LR", "GRA"]
+
+export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps) {
+  if (isLoading) {
+    return (
+      <div className="flex h-[300px] w-full items-center justify-center text-sm text-muted-foreground">
+        Loading your performance…
+      </div>
+    )
+  }
+
+  const hasScores = CRITERIA_ORDER.some((criterion) => typeof scores?.[criterion] === "number")
+
+  if (!hasScores) {
+    return (
+      <div className="flex h-[300px] w-full items-center justify-center text-center text-sm text-muted-foreground">
+        Submit a task to see your IELTS criteria breakdown.
+      </div>
+    )
+  }
+
+  const data = CRITERIA_ORDER.map((criterion) => ({
+    criteria: criterion,
+    current: scores?.[criterion] ?? 0,
+    target,
+  }))
+
   return (
     <ResponsiveContainer width="100%" height={300}>
       <RechartsRadar data={data}>
