@@ -52,9 +52,20 @@ export async function POST(req: Request) {
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 
 Task Response (TR): How well the essay addresses the task
+- For ${taskType}: Check if the essay directly responds to ALL parts of the prompt
+- Assess whether the essay stays on topic and doesn't deviate from the given prompt
+- Evaluate if the position/response is clear and well-developed
+- For Task 2: Check if both views are discussed if required, and opinion is clearly stated
+- PENALIZE essays that go off-topic or don't address the specific prompt given
+
 Coherence & Cohesion (CC): Organization and logical flow
 Lexical Resource (LR): Vocabulary range and accuracy
 Grammatical Range & Accuracy (GRA): Grammar complexity and correctness
+
+IMPORTANT: The Task Response (TR) score should heavily consider:
+1. Whether the essay addresses the SPECIFIC prompt given (not a different topic)
+2. Whether all parts of the task are answered
+3. Relevance to the topic throughout the essay
 
 Provide detailed, actionable feedback with specific examples from the text.
 
@@ -77,12 +88,13 @@ Return your response as a JSON object with this exact structure:
   "actionItems": ["action 1", "action 2", "action 3"]
 }`
 
-    const userPrompt = `Prompt: ${prompt}
+    const userPrompt = `PROMPT (This is what the essay MUST respond to):
+${prompt}
 
-Essay:
+ESSAY SUBMISSION:
 ${essay}
 
-Provide a comprehensive IELTS evaluation following the JSON structure specified.`
+Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
     const result = await model.generateContent({
       contents: [
