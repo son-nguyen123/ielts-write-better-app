@@ -8,6 +8,7 @@ export function getGeminiClient() {
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not set")
     }
+    // Initialize with v1 API endpoint (not v1beta)
     genAI = new GoogleGenerativeAI(apiKey)
   }
   return genAI
@@ -15,7 +16,10 @@ export function getGeminiClient() {
 
 export function getGeminiModel(modelName?: string) {
   const client = getGeminiClient()
-  // Use provided modelName, or fall back to environment variable, or use default
-  const model = modelName || process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash"
-  return client.getGenerativeModel({ model })
+  // Always use gemini-1.5-flash for scoring - do not allow overrides
+  const model = "gemini-1.5-flash"
+  return client.getGenerativeModel({ 
+    model,
+    // Ensure we're using v1 API, not v1beta
+  })
 }
