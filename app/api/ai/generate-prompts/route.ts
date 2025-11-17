@@ -1,0 +1,70 @@
+import { generateObject } from "ai"
+import { getGoogleModel } from "@/lib/ai"
+import { z } from "zod"
+
+export const maxDuration = 30
+
+const promptSchema = z.object({
+  prompts: z.array(
+    z.object({
+      id: z.string(),
+      type: z.enum(["Task 1", "Task 2"]),
+      title: z.string(),
+      description: z.string(),
+      tags: z.array(z.string()),
+    })
+  ),
+})
+
+export async function POST(req: Request) {
+  try {
+    const { taskType, topics, count } = await req.json()
+
+    const promptCount = count || 4
+    const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
+    const selectedTaskType = taskType || "all"
+
+    let taskTypeInstruction = ""
+    if (selectedTaskType === "Task 1") {
+      taskTypeInstruction = "Generate only IELTS Task 1 prompts (describing graphs, charts, diagrams, processes, or maps)."
+    } else if (selectedTaskType === "Task 2") {
+      taskTypeInstruction = "Generate only IELTS Task 2 prompts (essay questions on various topics)."
+    } else {
+      taskTypeInstruction = "Generate a mix of IELTS Task 1 and Task 2 prompts."
+    }
+
+    const topicsInstruction = selectedTopics.join(", ")
+
+    const { object } = await generateObject({
+      model: getGoogleModel(),
+      schema: promptSchema,
+      prompt: `Generate ${promptCount} unique and diverse IELTS writing prompts.
+
+${taskTypeInstruction}
+
+Focus on these topics: ${topicsInstruction}
+
+Requirements:
+- Make each prompt unique and realistic
+- For Task 1: Include specific chart/graph types (bar chart, line graph, pie chart, table, process diagram, map)
+- For Task 2: Create thought-provoking essay questions on relevant topics
+- Each prompt should have:
+  - A unique ID (use UUID format)
+  - Correct type ("Task 1" or "Task 2")
+  - A descriptive title
+  - A detailed description/question
+  - 2-4 relevant tags
+
+Ensure variety in:
+- Question types (opinion, discussion, problem-solution, advantages-disadvantages)
+- Difficulty levels
+- Contemporary and relevant topics`,
+      temperature: 0.9,
+    })
+
+    return Response.json({ prompts: object.prompts })
+  } catch (error) {
+    console.error("[v0] Error generating prompts:", error)
+    return Response.json({ error: "Failed to generate prompts" }, { status: 500 })
+  }
+}
