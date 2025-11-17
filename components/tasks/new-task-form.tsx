@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,14 @@ const task2Prompts = [
   { id: "6", title: "Environmental Issues", description: "Debate solutions to climate change" },
 ]
 
+type AIGeneratedPrompt = {
+  id: string
+  type: "Task 1" | "Task 2"
+  title: string
+  description: string
+  tags: string[]
+}
+
 export function NewTaskForm() {
   const router = useRouter()
   const { toast } = useToast()
@@ -44,10 +52,31 @@ export function NewTaskForm() {
   const [taskType, setTaskType] = useState<string>("Task 2")
   const [selectedPrompt, setSelectedPrompt] = useState<string>("")
   const [customPrompt, setCustomPrompt] = useState("")
+  const [promptTitle, setPromptTitle] = useState("")
   const [response, setResponse] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState<AIGeneratedPrompt | null>(null)
+
+  // Load AI-generated prompt from sessionStorage on mount
+  useEffect(() => {
+    const storedPrompt = sessionStorage.getItem("selectedPrompt")
+    if (storedPrompt) {
+      try {
+        const prompt: AIGeneratedPrompt = JSON.parse(storedPrompt)
+        setAiGeneratedPrompt(prompt)
+        setTaskType(prompt.type)
+        setCustomPrompt(prompt.description)
+        setPromptTitle(prompt.title)
+        setSelectedPrompt("ai-generated")
+        // Clear from sessionStorage after loading
+        sessionStorage.removeItem("selectedPrompt")
+      } catch (error) {
+        console.error("Failed to parse stored prompt:", error)
+      }
+    }
+  }, [])
 
   const prompts = taskType === "Task 1" ? task1Prompts : task2Prompts
   const wordCount = response.trim().split(/\s+/).filter(Boolean).length
@@ -56,8 +85,12 @@ export function NewTaskForm() {
     () => prompts.find((prompt) => prompt.id === selectedPrompt),
     [prompts, selectedPrompt],
   )
+  
+  // Use AI-generated prompt title if available, otherwise use selected prompt or generate from custom
   const resolvedPrompt = customPrompt.trim() || selectedPromptMeta?.description || ""
-  const resolvedTitle = selectedPromptMeta?.title ||
+  const resolvedTitle = aiGeneratedPrompt?.title || 
+    promptTitle ||
+    selectedPromptMeta?.title ||
     (resolvedPrompt ? `${taskType} - ${resolvedPrompt.slice(0, 50)}${resolvedPrompt.length > 50 ? "…" : ""}` : `${taskType} Submission`)
 
   const handleSaveDraft = () => {
@@ -181,12 +214,44 @@ export function NewTaskForm() {
             <div className="space-y-2">
               <Label>Select a Prompt</Label>
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {/* Show AI-generated prompt if available */}
+                {aiGeneratedPrompt && (
+                  <button
+                    onClick={() => {
+                      setSelectedPrompt("ai-generated")
+                      setCustomPrompt(aiGeneratedPrompt.description)
+                      setPromptTitle(aiGeneratedPrompt.title)
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                      selectedPrompt === "ai-generated"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-sm">{aiGeneratedPrompt.title}</p>
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-primary/20 text-primary">
+                        AI Generated
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{aiGeneratedPrompt.description}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {aiGeneratedPrompt.tags.map((tag) => (
+                        <span key={tag} className="px-2 py-0.5 text-xs rounded bg-secondary text-secondary-foreground">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                )}
+                
                 {prompts.map((prompt) => (
                   <button
                     key={prompt.id}
                     onClick={() => {
                       setSelectedPrompt(prompt.id)
                       setCustomPrompt(prompt.description)
+                      setPromptTitle(prompt.title)
                     }}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       selectedPrompt === prompt.id
@@ -208,6 +273,7 @@ export function NewTaskForm() {
                 onChange={(e) => {
                   setCustomPrompt(e.target.value)
                   setSelectedPrompt("")
+                  setPromptTitle("")
                 }}
                 placeholder="Enter a custom prompt..."
                 className="min-h-[100px]"
