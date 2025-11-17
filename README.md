@@ -67,7 +67,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 # Gemini AI Configuration
 GEMINI_API_KEY=your_gemini_api_key
 # Optional: Customize models (defaults shown below)
-# GEMINI_SCORE_MODEL=gemini-1.5-flash-8b
+# GEMINI_SCORE_MODEL=gemini-1.5-flash
 # GEMINI_SCORE_MODEL_FALLBACK=gemini-1.5-flash
 \`\`\`
 
@@ -78,7 +78,7 @@ GEMINI_API_KEY=your_gemini_api_key
    - Copy the key and add it to your \`.env.local\` file
 
    **Model Configuration:**
-   - The app uses \`gemini-1.5-flash-8b\` by default (free-tier friendly)
+   - The app uses \`gemini-1.5-flash\` by default (stable and reliable)
    - If quota limits are reached, it automatically falls back to \`gemini-1.5-flash\`
    - You can customize models via \`GEMINI_SCORE_MODEL\` and \`GEMINI_SCORE_MODEL_FALLBACK\` environment variables
 

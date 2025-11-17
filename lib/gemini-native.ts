@@ -16,6 +16,6 @@ export function getGeminiClient() {
 export function getGeminiModel(modelName?: string) {
   const client = getGeminiClient()
   // Use provided modelName, or fall back to environment variable, or use default
-  const model = modelName || process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash-8b"
+  const model = modelName || process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash"
   return client.getGenerativeModel({ model })
 }

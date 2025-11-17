@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     // Get model names from environment or use defaults
-    const primaryModel = process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash-8b"
+    const primaryModel = process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash"
     const fallbackModel = process.env.GEMINI_SCORE_MODEL_FALLBACK || "gemini-1.5-flash"
     
     const model = getGeminiModel(primaryModel)
