@@ -1,5 +1,6 @@
 import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -116,10 +117,12 @@ export async function POST(req: Request) {
 
     const topicsInstruction = selectedTopics.join(", ")
 
-    const { object } = await generateObject({
-      model: getGoogleModel(),
-      schema: promptSchema,
-      prompt: `Generate ${promptCount} unique and diverse IELTS writing prompts.
+    const { object } = await retryWithBackoff(
+      () =>
+        generateObject({
+          model: getGoogleModel(),
+          schema: promptSchema,
+          prompt: `Generate ${promptCount} unique and diverse IELTS writing prompts.
 
 ${taskTypeInstruction}
 
@@ -140,8 +143,10 @@ Ensure variety in:
 - Question types (opinion, discussion, problem-solution, advantages-disadvantages)
 - Difficulty levels
 - Contemporary and relevant topics`,
-      temperature: 0.9,
-    })
+          temperature: 0.9,
+        }),
+      GEMINI_RETRY_CONFIG
+    )
 
     return Response.json({ prompts: object.prompts })
   } catch (error) {

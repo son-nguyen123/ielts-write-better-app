@@ -1,5 +1,6 @@
 import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -22,10 +23,12 @@ export async function POST(req: Request) {
       return Response.json({ error: "Text is required" }, { status: 400 })
     }
 
-    const { object } = await generateObject({
-      model: getGoogleModel(),
-      schema: paraphraseSchema,
-      prompt: `Paraphrase the following text in 5 different styles for IELTS writing:
+    const { object } = await retryWithBackoff(
+      () =>
+        generateObject({
+          model: getGoogleModel(),
+          schema: paraphraseSchema,
+          prompt: `Paraphrase the following text in 5 different styles for IELTS writing:
 
 Original: "${text}"
 
@@ -37,8 +40,10 @@ Provide exactly 5 paraphrases with these styles:
 5. Expanded - More detailed expression
 
 Each paraphrase should maintain the original meaning while demonstrating the specified style.`,
-      temperature: 0.8,
-    })
+          temperature: 0.8,
+        }),
+      GEMINI_RETRY_CONFIG
+    )
 
     return Response.json({ paraphrases: object.paraphrases })
   } catch (error) {

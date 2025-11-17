@@ -1,4 +1,5 @@
 import { getGeminiModel } from "@/lib/gemini-native"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { z } from "zod"
 
 export const maxDuration = 60
@@ -96,18 +97,22 @@ ${essay}
 
 Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
-    })
+    const result = await retryWithBackoff(
+      () =>
+        model.generateContent({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.3,
+            responseMimeType: "application/json",
+          },
+        }),
+      GEMINI_RETRY_CONFIG
+    )
 
     const response = result.response
     const text = response.text()
