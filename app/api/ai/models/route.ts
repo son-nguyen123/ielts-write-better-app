@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const GEMINI_MODELS_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
+const GEMINI_MODELS_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models"
 
 interface GeminiModel {
   name?: string
