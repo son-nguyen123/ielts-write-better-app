@@ -13,7 +13,9 @@ export function getGeminiClient() {
   return genAI
 }
 
-export function getGeminiModel(modelName = "gemini-2.0-flash-exp") {
+export function getGeminiModel(modelName?: string) {
   const client = getGeminiClient()
-  return client.getGenerativeModel({ model: modelName })
+  // Use provided modelName, or fall back to environment variable, or use default
+  const model = modelName || process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash-8b"
+  return client.getGenerativeModel({ model })
 }

@@ -47,7 +47,11 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const model = getGeminiModel("gemini-2.0-flash-exp")
+    // Get model names from environment or use defaults
+    const primaryModel = process.env.GEMINI_SCORE_MODEL || "gemini-1.5-flash-8b"
+    const fallbackModel = process.env.GEMINI_SCORE_MODEL_FALLBACK || "gemini-1.5-flash"
+    
+    const model = getGeminiModel(primaryModel)
 
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 
@@ -96,18 +100,46 @@ ${essay}
 
 Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+    // Try primary model first, fallback to secondary if it fails
+    let result
+    let usedModel = primaryModel
+    try {
+      result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          maxOutputTokens: 1024, // Limit output tokens to reduce costs
         },
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
-    })
+      })
+    } catch (primaryError) {
+      console.error(`[v0] Primary model (${primaryModel}) failed:`, primaryError)
+      console.log(`[v0] Attempting fallback to ${fallbackModel}`)
+      
+      // Try fallback model
+      const fallbackModelInstance = getGeminiModel(fallbackModel)
+      usedModel = fallbackModel
+      result = await fallbackModelInstance.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          maxOutputTokens: 1024, // Limit output tokens to reduce costs
+        },
+      })
+    }
+
+    console.log(`[v0] Successfully used model: ${usedModel}`)
 
     const response = result.response
     const text = response.text()
