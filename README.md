@@ -56,13 +56,31 @@ npm install
 
 4. Create a \`.env.local\` file:
 \`\`\`env
+# Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# Gemini AI Configuration
+GEMINI_API_KEY=your_gemini_api_key
+# Optional: Customize models (defaults shown below)
+# GEMINI_SCORE_MODEL=gemini-1.5-flash-8b
+# GEMINI_SCORE_MODEL_FALLBACK=gemini-1.5-flash
 \`\`\`
+
+   **Getting a Gemini API Key:**
+   - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Sign in with your Google account
+   - Click "Create API Key"
+   - Copy the key and add it to your \`.env.local\` file
+
+   **Model Configuration:**
+   - The app uses \`gemini-1.5-flash-8b\` by default (free-tier friendly)
+   - If quota limits are reached, it automatically falls back to \`gemini-1.5-flash\`
+   - You can customize models via \`GEMINI_SCORE_MODEL\` and \`GEMINI_SCORE_MODEL_FALLBACK\` environment variables
 
 5. Uncomment Firebase code in:
    - \`lib/firebase.ts\`
