@@ -23,6 +23,10 @@ function getGoogleClient() {
   return googleClient
 }
 
+/**
+ * Get Google model for AI SDK
+ * Note: Retry logic is handled at the API route level using retryWithBackoff
+ */
 export function getGoogleModel(modelId?: string) {
   return getGoogleClient()(modelId ?? DEFAULT_GOOGLE_MODEL)
 }

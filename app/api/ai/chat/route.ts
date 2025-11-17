@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getGeminiModel } from "@/lib/gemini-native"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 
 export const maxDuration = 30
 
@@ -62,7 +63,10 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
 
     const lastMessage = geminiMessages[geminiMessages.length - 1]
-    const result = await chat.sendMessageStream(lastMessage.parts[0].text)
+    const result = await retryWithBackoff(
+      () => chat.sendMessageStream(lastMessage.parts[0].text),
+      GEMINI_RETRY_CONFIG
+    )
 
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
