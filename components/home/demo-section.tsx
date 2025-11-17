@@ -145,7 +145,7 @@ export function DemoSection() {
                     <p className="text-sm text-muted-foreground leading-relaxed">{feedback.summary}</p>
                   </div>
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </div>
