@@ -98,19 +98,38 @@ ${essay}
 Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
     // Call gemini-1.5-flash model using v1 API endpoint
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+    let result
+    try {
+      result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          maxOutputTokens: 1024,
         },
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-        maxOutputTokens: 1024,
-      },
-    })
+      })
+    } catch (apiError) {
+      console.error("[v0] Gemini API error:", apiError)
+      
+      // Detect specific error types
+      const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
+      
+      if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
+        throw new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
+      }
+      
+      if (errorMsg.includes("API key")) {
+        throw new Error("API key configuration error. Please contact support.")
+      }
+      
+      // Re-throw for general error handler
+      throw apiError
+    }
 
     const response = result.response
     const text = response.text()
@@ -133,6 +152,25 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     return Response.json({ feedback: validatedFeedback })
   } catch (error) {
     console.error("[v0] Error scoring essay:", error)
-    return Response.json({ error: error instanceof Error ? error.message : "Failed to score essay" }, { status: 500 })
+    
+    // Check if it's a quota/rate limit error
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const isQuotaError = 
+      errorMessage.includes("quota") || 
+      errorMessage.includes("RESOURCE_EXHAUSTED") ||
+      errorMessage.includes("429") ||
+      errorMessage.includes("rate limit") ||
+      errorMessage.includes("limit exceeded")
+    
+    if (isQuotaError) {
+      return Response.json({ 
+        error: "API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.",
+        quotaError: true 
+      }, { status: 429 })
+    }
+    
+    return Response.json({ 
+      error: error instanceof Error ? error.message : "Failed to score essay. Please try again." 
+    }, { status: 500 })
   }
 }
