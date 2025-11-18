@@ -21,18 +21,20 @@ Even if your usage dashboard shows you're not hitting limits, you can still get 
 
 We implement a **global server-side request queue** that ensures:
 - **Max 1 concurrent request** - Only one AI request runs at a time
-- **Minimum 3 seconds between requests** - Ensures max ~20 RPM (well below typical limits)
+- **Minimum 4 seconds between requests** - Ensures max ~15 RPM (conservative for stability)
 - **FIFO queue processing** - Requests are processed in order
 
-This prevents request bursts and ensures smooth quota usage.
+This prevents request bursts and ensures smooth quota usage with a safety margin.
 
 ### 2. Conservative Retry Configuration (`lib/retry-utils.ts`)
 
-Updated retry settings:
-- **Max 3 retries** (reduced from 8) - Avoid hammering the API
-- **5-second initial delay** (up from 2s) - Give more time for quota reset
-- **30-second max delay** (down from 60s) - Fail faster if persistent issues
+Updated retry settings for optimal quota usage:
+- **Max 1 retry** (reduced from 3) - Minimize API calls, fail faster
+- **5-second initial delay** - Give time for quota reset
+- **10-second max delay** (reduced from 30s) - Faster failure detection
 - **2x backoff multiplier** - Standard exponential backoff
+
+With these settings, a single request can make at most 2 API calls (1 initial + 1 retry), reducing quota consumption significantly.
 
 ### 3. All API Routes Updated
 
@@ -79,9 +81,9 @@ Better error messages in Vietnamese:
 
 ```
 Request A arrives → Process immediately (activeRequests: 1)
-Request B arrives → Queue (waiting for 3s interval)
-Request A completes after 2s → Wait 1s more
-After 3s total → Process Request B
+Request B arrives → Queue (waiting for 4s interval)
+Request A completes after 2s → Wait 2s more
+After 4s total → Process Request B
 Request C arrives → Queue behind B
 ```
 
@@ -96,7 +98,7 @@ export function getGeminiRateLimiter(): ServerRateLimiter {
   if (!geminiRateLimiter) {
     geminiRateLimiter = new ServerRateLimiter({
       maxConcurrent: 1,
-      minInterval: 5000, // Change from 3000 to 5000 (12 RPM max)
+      minInterval: 5000, // Change from 4000 to 5000 (12 RPM max)
     })
   }
   return geminiRateLimiter
@@ -107,9 +109,9 @@ export function getGeminiRateLimiter(): ServerRateLimiter {
 ```typescript
 // In lib/retry-utils.ts
 export const GEMINI_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 2, // Change from 3 to 2
+  maxRetries: 0, // Change from 1 to 0 (no retries, fail immediately)
   initialDelayMs: 5000,
-  maxDelayMs: 30000,
+  maxDelayMs: 10000,
   backoffMultiplier: 2,
 }
 ```
@@ -119,8 +121,8 @@ export const GEMINI_RETRY_CONFIG: RetryConfig = {
 ### Check Logs
 Server logs will show:
 ```
-[Retry] Rate limit hit. Retry #1/3 after 5000ms
-[score-essay] Error details: { status: 429, message: "...", timestamp: "..." }
+[Retry] Rate limit hit. Retry #1/1 after 5000ms
+[score-essay] Raw error details: { status: 429, responseStatus: ..., responseData: ..., message: "...", timestamp: "..." }
 ```
 
 ### Verify API Key & Project
@@ -179,8 +181,8 @@ Server logs will show:
 
 This is expected! With rate limiting:
 - First request: Immediate
-- Second request: 3+ seconds wait
-- Third request: 3+ seconds wait
+- Second request: 4+ seconds wait
+- Third request: 4+ seconds wait
 - etc.
 
 This is intentional to prevent quota exhaustion.
@@ -189,9 +191,9 @@ This is intentional to prevent quota exhaustion.
 
 The rate limiting implementation ensures:
 ✅ No simultaneous API calls  
-✅ Minimum 3s between requests  
-✅ Conservative retry strategy  
-✅ Better error messages  
+✅ Minimum 4s between requests (15 RPM max)
+✅ Minimal retry strategy (1 retry max)
+✅ Better error detection and logging
 ✅ Detailed logging for debugging  
 
 This should significantly reduce quota exceeded errors while providing a stable user experience.
