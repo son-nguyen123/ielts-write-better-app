@@ -98,7 +98,7 @@ Please provide your IELTS evaluation.`
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang quản lý nhiều yêu cầu để tránh vượt quota. Vui lòng thử lại sau 1-2 phút.",
+        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút.",
         errorType: "RATE_LIMIT",
         retryAfter: 120 // Suggest retry after 2 minutes
       }, { status: 429 })

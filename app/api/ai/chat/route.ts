@@ -115,7 +115,7 @@ Essay: ${attachedTask?.essay ?? ""}`
     
     if (isRateLimitError) {
       return NextResponse.json({ 
-        error: "AI chat đang vượt giới hạn sử dụng. Hệ thống đang quản lý yêu cầu để tránh vượt quota. Vui lòng thử lại sau vài phút.",
+        error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
         errorType: "RATE_LIMIT"
       }, { status: 429 })
     }
