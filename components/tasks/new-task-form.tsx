@@ -149,16 +149,17 @@ export function NewTaskForm() {
 
         if (!scoringResponse.ok || !data?.feedback) {
           // Check for rate limit errors
-          let errorTitle = "Scoring failed"
-          let errorMessage = data?.error || "Failed to score essay. Please try again."
+          let errorTitle = "Lỗi chấm điểm"
+          let errorMessage = data?.error || "Không thể chấm điểm bài viết. Vui lòng thử lại."
           
           if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
-            errorTitle = "Vượt giới hạn sử dụng"
-            errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+            errorTitle = "Hệ thống đang bận"
+            errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang xử lý nhiều yêu cầu. Vui lòng thử lại sau 1-2 phút."
           }
           
           const error: any = new Error(errorMessage)
           error.title = errorTitle
+          error.retryable = scoringResponse.status === 429
           throw error
         }
 
@@ -182,16 +183,26 @@ export function NewTaskForm() {
       })
 
       toast({
-        title: "Task submitted",
-        description: "Your task has been scored successfully.",
+        title: "Nhiệm vụ đã được gửi",
+        description: "Bài viết của bạn đã được chấm điểm thành công.",
       })
       router.push(`/tasks/${taskId}`)
     } catch (error: any) {
       console.error("[v0] Error submitting task:", error)
+      
+      // Provide more helpful error messages
+      let errorDescription = error?.message || "Không thể gửi nhiệm vụ. Vui lòng thử lại."
+      
+      // Add helpful suggestion for rate limit errors
+      if (error?.retryable) {
+        errorDescription += "\n\nGợi ý: Bạn có thể lưu bản nháp và thử lại sau, hoặc đợi một chút rồi nhấn gửi lại."
+      }
+      
       toast({
-        title: error?.title || "Error",
-        description: error?.message || "Failed to submit task. Please try again.",
+        title: error?.title || "Lỗi",
+        description: errorDescription,
         variant: "destructive",
+        duration: 7000, // Show longer for rate limit errors
       })
     } finally {
       setIsSubmitting(false)
@@ -363,17 +374,22 @@ export function NewTaskForm() {
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Submit for Scoring?</DialogTitle>
-            <DialogDescription>
-              Your essay will be analyzed by our AI system. This process typically takes 30-60 seconds. You can view the
-              results on the task detail page.
+            <DialogTitle>Gửi bài viết để chấm điểm?</DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p>
+                Bài viết của bạn sẽ được phân tích bởi hệ thống AI. Quá trình này thường mất 30-60 giây.
+              </p>
+              <p className="text-xs">
+                <strong>Lưu ý:</strong> Nếu hệ thống đang bận, yêu cầu của bạn sẽ được xếp hàng và tự động xử lý. 
+                Hệ thống sẽ tự động thử lại nếu gặp lỗi giới hạn. Bạn có thể xem kết quả trên trang chi tiết nhiệm vụ.
+              </p>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)} className="bg-transparent">
-              Cancel
+              Hủy
             </Button>
-            <Button onClick={confirmSubmit}>Confirm Submit</Button>
+            <Button onClick={confirmSubmit}>Xác nhận gửi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

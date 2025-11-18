@@ -40,12 +40,18 @@ export function AIQueueIndicator({
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <div className="flex flex-col gap-0.5">
             <span className="font-medium">
-              {isActive && "Đang xử lý"}
+              {isActive && "Đang xử lý yêu cầu AI"}
+              {hasQueue && !isActive && "Yêu cầu đang trong hàng đợi"}
               {hasQueue && ` (${status.queueLength} yêu cầu đang chờ)`}
             </span>
             {hasQueue && (
               <span className="text-xs text-muted-foreground">
-                Hệ thống đang giới hạn tốc độ để tránh vượt giới hạn API
+                Hệ thống xử lý từng yêu cầu một để tránh vượt giới hạn. Vui lòng đợi...
+              </span>
+            )}
+            {!hasQueue && isActive && (
+              <span className="text-xs text-muted-foreground">
+                Đang chấm điểm bài viết của bạn, có thể mất 30-60 giây
               </span>
             )}
           </div>

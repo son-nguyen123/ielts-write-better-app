@@ -18,9 +18,9 @@ interface QueueConfig {
 }
 
 const DEFAULT_CONFIG: QueueConfig = {
-  maxConcurrent: 2, // Max 2 concurrent AI requests
-  minInterval: 1000, // At least 1 second between requests
-  maxQueueSize: 20, // Max 20 queued requests
+  maxConcurrent: 1, // Max 1 concurrent AI request to avoid rate limits
+  minInterval: 2000, // At least 2 seconds between requests for better rate limit compliance
+  maxQueueSize: 50, // Max 50 queued requests to handle more users
 }
 
 export class RequestQueue {
@@ -141,9 +141,9 @@ let globalAIQueue: RequestQueue | null = null
 export function getAIRequestQueue(): RequestQueue {
   if (!globalAIQueue) {
     globalAIQueue = new RequestQueue({
-      maxConcurrent: 2,
-      minInterval: 1000,
-      maxQueueSize: 20,
+      maxConcurrent: 1,
+      minInterval: 2000,
+      maxQueueSize: 50,
     })
   }
   return globalAIQueue
