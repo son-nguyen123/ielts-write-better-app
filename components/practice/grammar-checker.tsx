@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { queueAIRequest } from "@/lib/request-queue"
+import { AIQueueIndicator } from "@/components/ui/ai-queue-indicator"
 
 export function GrammarChecker() {
   const { toast } = useToast()
@@ -17,40 +19,37 @@ export function GrammarChecker() {
   const handleCheck = async () => {
     setIsChecking(true)
     try {
-      const response = await fetch("/api/ai/grammar-check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input }),
-      })
+      const data = await queueAIRequest(async () => {
+        const response = await fetch("/api/ai/grammar-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: input }),
+        })
 
-      const data = await response.json()
-      
-      if (!response.ok) {
-        // Check for rate limit errors
-        if (response.status === 429 || data?.errorType === "RATE_LIMIT") {
-          toast({
-            title: "Vượt giới hạn sử dụng",
-            description: data?.error || "AI kiểm tra ngữ pháp đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-            variant: "destructive",
-          })
-        } else {
-          toast({
-            title: "Error",
-            description: data?.error || "Failed to check grammar. Please try again.",
-            variant: "destructive",
-          })
+        const result = await response.json()
+        
+        if (!response.ok) {
+          // Check for rate limit errors
+          if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+            const error: any = new Error(result?.error || "AI kiểm tra ngữ pháp đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
+            error.title = "Vượt giới hạn sử dụng"
+            throw error
+          } else {
+            throw new Error(result?.error || "Failed to check grammar. Please try again.")
+          }
         }
-        return
-      }
+        
+        return result
+      })
       
       if (data.issues) {
         setIssues(data.issues)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error checking grammar:", error)
       toast({
-        title: "Error",
-        description: "Failed to check grammar. Please try again.",
+        title: error?.title || "Error",
+        description: error?.message || "Failed to check grammar. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -106,6 +105,9 @@ export function GrammarChecker() {
                 </>
               )}
             </Button>
+
+            {/* Queue Status Indicator */}
+            <AIQueueIndicator />
           </CardContent>
         </Card>
 

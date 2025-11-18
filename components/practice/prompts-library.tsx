@@ -9,6 +9,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Eye, Sparkles, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { queueAIRequest } from "@/lib/request-queue"
+import { AIQueueIndicator } from "@/components/ui/ai-queue-indicator"
 
 type Prompt = {
   id: string
@@ -47,33 +49,36 @@ export function PromptsLibrary() {
   const generatePrompts = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/ai/generate-prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType: activeTab === "all" ? null : activeTab,
-          topics: selectedTopics.length > 0 ? selectedTopics : availableTopics,
-          count: 6,
-        }),
-      })
+      const data = await queueAIRequest(async () => {
+        const response = await fetch("/api/ai/generate-prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskType: activeTab === "all" ? null : activeTab,
+            topics: selectedTopics.length > 0 ? selectedTopics : availableTopics,
+            count: 6,
+          }),
+        })
 
-      const data = await response.json()
+        const result = await response.json()
 
-      if (!response.ok) {
-        // Check for rate limit errors
-        if (response.status === 429 || data?.errorType === "RATE_LIMIT") {
-          toast.error(data?.error || "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
-        } else {
-          toast.error(data?.error || "Failed to generate prompts. Please try again.")
+        if (!response.ok) {
+          // Check for rate limit errors
+          if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+            throw new Error(result?.error || "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
+          } else {
+            throw new Error(result?.error || "Failed to generate prompts. Please try again.")
+          }
         }
-        return
-      }
+
+        return result
+      })
 
       setPrompts(data.prompts)
       toast.success("New prompts generated!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating prompts:", error)
-      toast.error("Failed to generate prompts. Please try again.")
+      toast.error(error?.message || "Failed to generate prompts. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -151,6 +156,9 @@ export function PromptsLibrary() {
               ? "All topics selected by default. Click to filter specific topics."
               : `${selectedTopics.length} topic(s) selected`}
           </p>
+
+          {/* Queue Status Indicator */}
+          <AIQueueIndicator />
         </CardContent>
       </Card>
 
