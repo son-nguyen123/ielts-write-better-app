@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { getGeminiModel } from "@/lib/gemini-native"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 30
 
@@ -62,7 +64,13 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
 
     const lastMessage = geminiMessages[geminiMessages.length - 1]
-    const result = await chat.sendMessageStream(lastMessage.parts[0].text)
+    // Use server-side rate limiting to prevent quota exhaustion
+    const result = await withRateLimit(() =>
+      retryWithBackoff(
+        () => chat.sendMessageStream(lastMessage.parts[0].text),
+        GEMINI_RETRY_CONFIG
+      )
+    )
 
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
@@ -89,6 +97,32 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
-    return NextResponse.json({ error: err?.message ?? "Failed to process chat" }, { status: 500 })
+    console.error("[/api/ai/chat] Error details:", {
+      status: err?.status,
+      message: err?.message,
+      timestamp: new Date().toISOString(),
+    })
+    
+    // Check for rate limit / quota errors
+    const errorMessage = err?.message || err?.toString() || ""
+    const isRateLimitError = 
+      err?.status === 429 ||
+      err?.response?.status === 429 ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.includes("429")
+    
+    if (isRateLimitError) {
+      return NextResponse.json({ 
+        error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        errorType: "RATE_LIMIT"
+      }, { status: 429 })
+    }
+    
+    return NextResponse.json({ 
+      error: err?.message ?? "Failed to process chat",
+      errorType: "GENERIC"
+    }, { status: 500 })
   }
 }

@@ -1,5 +1,7 @@
 import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { withRateLimit } from "@/lib/server-rate-limiter"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -22,10 +24,14 @@ export async function POST(req: Request) {
       return Response.json({ error: "Text is required" }, { status: 400 })
     }
 
-    const { object } = await generateObject({
-      model: getGoogleModel(),
-      schema: paraphraseSchema,
-      prompt: `Paraphrase the following text in 5 different styles for IELTS writing:
+    // Use server-side rate limiting to prevent quota exhaustion
+    const { object } = await withRateLimit(() =>
+      retryWithBackoff(
+        () =>
+          generateObject({
+            model: getGoogleModel(),
+            schema: paraphraseSchema,
+            prompt: `Paraphrase the following text in 5 different styles for IELTS writing:
 
 Original: "${text}"
 
@@ -37,12 +43,36 @@ Provide exactly 5 paraphrases with these styles:
 5. Expanded - More detailed expression
 
 Each paraphrase should maintain the original meaning while demonstrating the specified style.`,
-      temperature: 0.8,
-    })
+            temperature: 0.8,
+          }),
+        GEMINI_RETRY_CONFIG
+      )
+    )
 
     return Response.json({ paraphrases: object.paraphrases })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[v0] Error generating paraphrases:", error)
-    return Response.json({ error: "Failed to generate paraphrases" }, { status: 500 })
+    
+    // Check for rate limit / quota errors
+    const errorMessage = error?.message || error?.toString() || ""
+    const isRateLimitError = 
+      error?.status === 429 ||
+      error?.response?.status === 429 ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.includes("429")
+    
+    if (isRateLimitError) {
+      return Response.json({ 
+        error: "AI diễn giải đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        errorType: "RATE_LIMIT"
+      }, { status: 429 })
+    }
+    
+    return Response.json({ 
+      error: "Failed to generate paraphrases",
+      errorType: "GENERIC"
+    }, { status: 500 })
   }
 }

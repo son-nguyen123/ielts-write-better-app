@@ -57,16 +57,22 @@ export function PromptsLibrary() {
         }),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        throw new Error("Failed to generate prompts")
+        // Check for rate limit errors
+        if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+          throw new Error(result?.error || "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
+        } else {
+          throw new Error(result?.error || "Failed to generate prompts. Please try again.")
+        }
       }
 
-      const data = await response.json()
-      setPrompts(data.prompts)
+      setPrompts(result.prompts)
       toast.success("New prompts generated!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating prompts:", error)
-      toast.error("Failed to generate prompts. Please try again.")
+      toast.error(error?.message || "Failed to generate prompts. Please try again.")
     } finally {
       setIsLoading(false)
     }

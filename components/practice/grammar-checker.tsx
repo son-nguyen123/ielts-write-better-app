@@ -23,15 +23,27 @@ export function GrammarChecker() {
         body: JSON.stringify({ text: input }),
       })
 
-      const data = await response.json()
-      if (data.issues) {
-        setIssues(data.issues)
+      const result = await response.json()
+      
+      if (!response.ok) {
+        // Check for rate limit errors
+        if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+          const error: any = new Error(result?.error || "AI kiểm tra ngữ pháp đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
+          error.title = "Vượt giới hạn sử dụng"
+          throw error
+        } else {
+          throw new Error(result?.error || "Failed to check grammar. Please try again.")
+        }
       }
-    } catch (error) {
+      
+      if (result.issues) {
+        setIssues(result.issues)
+      }
+    } catch (error: any) {
       console.error("[v0] Error checking grammar:", error)
       toast({
-        title: "Error",
-        description: "Failed to check grammar. Please try again.",
+        title: error?.title || "Error",
+        description: error?.message || "Failed to check grammar. Please try again.",
         variant: "destructive",
       })
     } finally {

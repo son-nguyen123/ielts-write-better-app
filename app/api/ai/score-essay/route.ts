@@ -1,43 +1,8 @@
 import { getGeminiModel } from "@/lib/gemini-native"
-import { z } from "zod"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 60
-
-const feedbackSchema = z.object({
-  overallBand: z.number().min(0).max(9),
-  summary: z.string(),
-  criteria: z.object({
-    TR: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-    CC: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-    LR: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-    GRA: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-  }),
-  actionItems: z.array(z.string()),
-})
 
 export async function POST(req: Request) {
   try {
@@ -92,7 +57,7 @@ Return your response as a JSON object with this exact structure:
     const userPrompt = `PROMPT (This is what the essay MUST respond to):
 ${prompt}
 
-ESSAY SUBMISSION:
+ESSAY:
 ${essay}
 
 Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
@@ -134,20 +99,74 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     const response = result.response
     const text = response.text()
 
-    console.log("[v0] Raw Gemini response:", text)
+    console.log("[score-essay] AI response:", text)
 
-    // Parse and validate the JSON response
-    let parsedResponse
-    try {
-      parsedResponse = JSON.parse(text)
-    } catch (parseError) {
-      console.error("[v0] Failed to parse JSON:", parseError)
-      console.error("[v0] Response text:", text)
-      throw new Error("Invalid JSON response from AI")
+    // Parse the simple text response into a basic feedback structure
+    const feedback = {
+      overallBand: extractBandScore(text),
+      summary: extractSummary(text),
+      criteria: extractCriteria(text),
+      actionItems: extractActionItems(text),
     }
 
-    // Validate with Zod schema
-    const validatedFeedback = feedbackSchema.parse(parsedResponse)
+    return Response.json({ feedback })
+  } catch (error: any) {
+    console.error("[score-essay] Error:", error)
+    
+    // Log detailed error information for debugging
+    console.error("[score-essay] Raw error details:", {
+      status: error?.status,
+      responseStatus: error?.response?.status,
+      responseData: error?.response?.data,
+      message: error?.message,
+      timestamp: new Date().toISOString(),
+    })
+    
+    // Check for rate limit / quota errors with more precise detection
+    const errorMessage = error?.message || error?.toString() || ""
+    const errorString = errorMessage.toLowerCase()
+    
+    // More precise rate limit detection - avoid false positives
+    const isRateLimitError = 
+      error?.status === 429 ||
+      error?.response?.status === 429 ||
+      errorString.includes("resource_exhausted") ||
+      errorString.includes("too many requests") ||
+      (errorString.includes("rate limit") && !errorString.includes("unlimited"))
+    
+    if (isRateLimitError) {
+      return Response.json({ 
+        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút.",
+        errorType: "RATE_LIMIT",
+        retryAfter: 120 // Suggest retry after 2 minutes
+      }, { status: 429 })
+    }
+    
+    // Generic error
+    return Response.json({ 
+      error: error instanceof Error ? error.message : "Không thể chấm điểm bài viết. Vui lòng kiểm tra kết nối và thử lại.",
+      errorType: "GENERIC"
+    }, { status: 500 })
+  }
+}
+
+// Helper functions to parse the simple text response
+function extractBandScore(text: string): number {
+  // Look for "OVERALL BAND: X" or similar patterns
+  const overallMatch = text.match(/overall\s+band[:\s]+(\d+(?:\.\d+)?)/i)
+  if (overallMatch) {
+    const score = parseFloat(overallMatch[1])
+    return Math.min(9, Math.max(0, score))
+  }
+  
+  // Fallback: look for any score pattern
+  const match = text.match(/(?:overall|band|score)[:\s]+(\d+(?:\.\d+)?)/i)
+  if (match) {
+    const score = parseFloat(match[1])
+    return Math.min(9, Math.max(0, score))
+  }
+  return 6.0 // Default fallback
+}
 
     return Response.json({ feedback: validatedFeedback })
   } catch (error) {
@@ -173,4 +192,6 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       error: error instanceof Error ? error.message : "Failed to score essay. Please try again." 
     }, { status: 500 })
   }
+  
+  return items.slice(0, 5) // Limit to 5 items
 }
