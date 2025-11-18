@@ -12,55 +12,89 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    // Use only gemini-1.5-flash model - no configuration or fallback
     const model = getGeminiModel()
 
-    const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria.
+    const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 
-Provide your evaluation in this format:
+Task Response (TR): How well the essay addresses the task
+- For ${taskType}: Check if the essay directly responds to ALL parts of the prompt
+- Assess whether the essay stays on topic and doesn't deviate from the given prompt
+- Evaluate if the position/response is clear and well-developed
+- For Task 2: Check if both views are discussed if required, and opinion is clearly stated
+- PENALIZE essays that go off-topic or don't address the specific prompt given
 
-OVERALL BAND: [score 0-9]
+Coherence & Cohesion (CC): Organization and logical flow
+Lexical Resource (LR): Vocabulary range and accuracy
+Grammatical Range & Accuracy (GRA): Grammar complexity and correctness
 
-SCORES:
-- TR (Task Response): [score 0-9]
-- CC (Coherence & Cohesion): [score 0-9]
-- LR (Lexical Resource): [score 0-9]
-- GRA (Grammatical Range & Accuracy): [score 0-9]
+IMPORTANT: The Task Response (TR) score should heavily consider:
+1. Whether the essay addresses the SPECIFIC prompt given (not a different topic)
+2. Whether all parts of the task are answered
+3. Relevance to the topic throughout the essay
 
-SUMMARY:
-[Brief overall assessment]
+Provide detailed, actionable feedback with specific examples from the text.
 
-ACTION ITEMS:
-1. [First improvement suggestion]
-2. [Second improvement suggestion]
-3. [Third improvement suggestion]`
+Return your response as a JSON object with this exact structure:
+{
+  "overallBand": number (0-9, can use .5 increments),
+  "summary": "brief overall assessment",
+  "criteria": {
+    "TR": {
+      "score": number (0-9),
+      "strengths": ["strength 1", "strength 2"],
+      "issues": ["issue 1", "issue 2"],
+      "suggestions": ["suggestion 1", "suggestion 2"],
+      "examples": ["example 1", "example 2"]
+    },
+    "CC": { same structure },
+    "LR": { same structure },
+    "GRA": { same structure }
+  },
+  "actionItems": ["action 1", "action 2", "action 3"]
+}`
 
-    const userPrompt = `PROMPT:
+    const userPrompt = `PROMPT (This is what the essay MUST respond to):
 ${prompt}
 
 ESSAY:
 ${essay}
 
-Please provide your IELTS evaluation.`
+Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
-    // Use server-side rate limiting to prevent quota exhaustion
-    const result = await withRateLimit(() =>
-      retryWithBackoff(
-        () =>
-          model.generateContent({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1500,
-            },
-          }),
-        GEMINI_RETRY_CONFIG
-      )
-    )
+    // Call gemini-1.5-flash model using v1 API endpoint
+    let result
+    try {
+      result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          maxOutputTokens: 1024,
+        },
+      })
+    } catch (apiError) {
+      console.error("[v0] Gemini API error:", apiError)
+      
+      // Detect specific error types
+      const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
+      
+      if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
+        throw new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
+      }
+      
+      if (errorMsg.includes("API key")) {
+        throw new Error("API key configuration error. Please contact support.")
+      }
+      
+      // Re-throw for general error handler
+      throw apiError
+    }
 
     const response = result.response
     const text = response.text()
@@ -134,100 +168,29 @@ function extractBandScore(text: string): number {
   return 6.0 // Default fallback
 }
 
-function extractSummary(text: string): string {
-  // Look for SUMMARY section
-  const summaryMatch = text.match(/SUMMARY[:\s]+(.+?)(?=ACTION ITEMS|$)/is)
-  if (summaryMatch) {
-    return summaryMatch[1].trim().split('\n')[0].trim()
-  }
-  
-  // Fallback: extract the first meaningful paragraph
-  const lines = text.split('\n').filter(line => line.trim() && !line.match(/^(OVERALL|SCORES|TR|CC|LR|GRA|ACTION)/i))
-  if (lines.length > 0) {
-    return lines[0].trim()
-  }
-  return "Your essay has been evaluated."
-}
-
-function extractCriteria(text: string): any {
-  // Extract scores for each criterion from the SCORES section
-  const criteria = {
-    TR: extractCriterionScore(text, 'TR', 'Task Response'),
-    CC: extractCriterionScore(text, 'CC', 'Coherence'),
-    LR: extractCriterionScore(text, 'LR', 'Lexical'),
-    GRA: extractCriterionScore(text, 'GRA', 'Grammar'),
-  }
-  
-  return criteria
-}
-
-function extractCriterionScore(text: string, code: string, name: string): any {
-  // Look for patterns like "TR (Task Response): 7" or "- TR: 7"
-  const patterns = [
-    new RegExp(`-?\\s*${code}\\s*\\([^)]+\\)[:\\s]+(\\d+(?:\\.\\d+)?)`, 'i'),
-    new RegExp(`-?\\s*${code}[:\\s]+(\\d+(?:\\.\\d+)?)`, 'i'),
-    new RegExp(`${name}[:\\s]+(\\d+(?:\\.\\d+)?)`, 'i'),
-  ]
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern)
-    if (match) {
-      const score = Math.min(9, Math.max(0, parseFloat(match[1])))
-      return {
-        score,
-        strengths: [],
-        issues: [],
-        suggestions: [],
-        examples: [],
-      }
-    }
-  }
-  
-  // Default fallback
-  return {
-    score: 6.0,
-    strengths: [],
-    issues: [],
-    suggestions: [],
-    examples: [],
-  }
-}
-
-function extractActionItems(text: string): string[] {
-  const items: string[] = []
-  
-  // Look for ACTION ITEMS section
-  const actionMatch = text.match(/ACTION ITEMS[:\s]+(.+?)$/is)
-  if (actionMatch) {
-    const actionText = actionMatch[1]
-    const lines = actionText.split('\n')
+    return Response.json({ feedback: validatedFeedback })
+  } catch (error) {
+    console.error("[v0] Error scoring essay:", error)
     
-    for (const line of lines) {
-      const cleaned = line.replace(/^\d+\.\s*/, '').replace(/^[-\*\•]\s*/, '').trim()
-      if (cleaned && cleaned.length > 10 && !cleaned.match(/^(OVERALL|SCORES|SUMMARY)/i)) {
-        items.push(cleaned)
-      }
+    // Check if it's a quota/rate limit error
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const isQuotaError = 
+      errorMessage.includes("quota") || 
+      errorMessage.includes("RESOURCE_EXHAUSTED") ||
+      errorMessage.includes("429") ||
+      errorMessage.includes("rate limit") ||
+      errorMessage.includes("limit exceeded")
+    
+    if (isQuotaError) {
+      return Response.json({ 
+        error: "API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.",
+        quotaError: true 
+      }, { status: 429 })
     }
-  }
-  
-  // If no items found in structured format, look for numbered or bulleted lists
-  if (items.length === 0) {
-    const lines = text.split('\n')
-    for (const line of lines) {
-      if (line.match(/^[\d\-\*\•]\s*(.+)/)) {
-        const cleaned = line.replace(/^[\d\-\*\•]\s*/, '').trim()
-        if (cleaned && cleaned.length > 10 && !cleaned.match(/^(TR|CC|LR|GRA|OVERALL|SCORES|SUMMARY)/i)) {
-          items.push(cleaned)
-        }
-      }
-    }
-  }
-  
-  // Ensure we have at least some action items
-  if (items.length === 0) {
-    items.push("Continue practicing IELTS writing tasks")
-    items.push("Review grammar and vocabulary resources")
-    items.push("Focus on addressing all parts of the task prompt")
+    
+    return Response.json({ 
+      error: error instanceof Error ? error.message : "Failed to score essay. Please try again." 
+    }, { status: 500 })
   }
   
   return items.slice(0, 5) // Limit to 5 items

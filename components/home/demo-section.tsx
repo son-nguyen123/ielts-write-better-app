@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Loader2 } from "lucide-react"
+import { Loader2, AlertCircle } from "lucide-react"
 
 const sampleEssay = `Some people believe that technology has made our lives more complex, while others think it has simplified them. In my opinion, while technology has introduced certain complexities, it has overall made our lives significantly easier.
 
@@ -19,9 +19,12 @@ export function DemoSection() {
   const [text, setText] = useState(sampleEssay)
   const [isScoring, setIsScoring] = useState(false)
   const [feedback, setFeedback] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleRunDemo = async () => {
     setIsScoring(true)
+    setError(null)
+    setFeedback(null)
     try {
       const response = await fetch("/api/ai/score-essay", {
         method: "POST",
@@ -35,11 +38,20 @@ export function DemoSection() {
       })
 
       const data = await response.json()
+      
+      if (!response.ok) {
+        setError(data.error || "Failed to score essay. Please try again.")
+        return
+      }
+      
       if (data.feedback) {
         setFeedback(data.feedback)
+      } else {
+        setError("No feedback received. Please try again.")
       }
     } catch (error) {
       console.error("[v0] Error scoring essay:", error)
+      setError("Failed to score essay. Please check your connection and try again.")
     } finally {
       setIsScoring(false)
     }
@@ -86,11 +98,24 @@ export function DemoSection() {
               <CardTitle>AI Feedback</CardTitle>
             </CardHeader>
             <CardContent>
-              {!feedback ? (
+              {error ? (
+                <div className="rounded-lg border border-red-500 bg-red-50 dark:bg-red-950 p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              
+              {!feedback && !error ? (
                 <div className="flex items-center justify-center min-h-[300px] text-muted-foreground">
                   Click "Run Demo Scoring" to see AI feedback
                 </div>
-              ) : (
+              ) : null}
+              
+              {feedback ? (
                 <div className="space-y-6">
                   <div className="text-center py-6 border-b border-border">
                     <div className="text-5xl font-bold text-primary mb-2">{feedback.overallBand.toFixed(1)}</div>
@@ -120,7 +145,7 @@ export function DemoSection() {
                     <p className="text-sm text-muted-foreground leading-relaxed">{feedback.summary}</p>
                   </div>
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </div>

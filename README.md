@@ -56,13 +56,28 @@ npm install
 
 4. Create a \`.env.local\` file:
 \`\`\`env
+# Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# Gemini AI Configuration
+GEMINI_API_KEY=your_gemini_api_key
 \`\`\`
+
+   **Getting a Gemini API Key:**
+   - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Sign in with your Google account
+   - Click "Create API Key"
+   - Copy the key and add it to your \`.env.local\` file
+
+   **AI Model Information:**
+   - The essay scoring system uses \`gemini-1.5-flash\` model exclusively
+   - The model is hardcoded to ensure consistent and reliable IELTS evaluations
+   - Uses v1 API endpoint: \`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent\`
 
 5. Uncomment Firebase code in:
    - \`lib/firebase.ts\`
