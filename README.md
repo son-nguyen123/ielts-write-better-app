@@ -75,9 +75,9 @@ GEMINI_API_KEY=your_gemini_api_key
    - Copy the key and add it to your \`.env.local\` file
 
    **AI Model Information:**
-   - The essay scoring system uses \`gemini-1.5-flash\` model exclusively
+   - The essay scoring system uses \`gemini-2.0-flash\` model exclusively
    - The model is hardcoded to ensure consistent and reliable IELTS evaluations
-   - Uses v1 API endpoint: \`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent\`
+   - Uses v1 API endpoint: \`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent\`
 
 5. Uncomment Firebase code in:
    - \`lib/firebase.ts\`
