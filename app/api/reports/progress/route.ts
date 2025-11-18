@@ -30,9 +30,9 @@ export async function POST(req: NextRequest) {
     const allTasks = (await getTasks(userId)) as TaskDocument[]
     
     // Filter tasks that have been scored (have overallBand)
+    // Note: We don't filter by status because scored tasks can have different status values
     const scoredTasks = allTasks.filter(task => 
       task.overallBand !== undefined && 
-      task.status === "submitted" &&
       task.createdAt
     )
 
@@ -131,6 +131,6 @@ function calculatePracticeTime(tasks: TaskDocument[]) {
   return {
     hoursThisWeek: estimateHours(tasksThisWeek),
     hoursThisMonth: estimateHours(tasksThisMonth),
-    tasksCompleted: tasks.filter(task => task.status === "submitted").length
+    tasksCompleted: tasks.filter(task => task.overallBand !== undefined).length
   }
 }
