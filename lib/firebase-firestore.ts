@@ -18,10 +18,22 @@ import { db } from "./firebase"
 // Tasks
 export async function createTask(userId: string, taskData: any) {
   const tasksRef = collection(db, "users", userId, "tasks")
+  const now = Timestamp.now()
+  
+  // Create initial revision if feedback exists
+  const revisions = taskData.feedback ? [{
+    id: taskData.revisionId || `rev_${Date.now()}`,
+    overallBand: taskData.overallBand || taskData.feedback.overallBand,
+    summary: taskData.summary || taskData.feedback.summary,
+    createdAt: now,
+    feedback: taskData.feedback
+  }] : []
+  
   const docRef = await addDoc(tasksRef, {
     ...taskData,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
+    revisions,
+    createdAt: now,
+    updatedAt: now,
   })
   return docRef.id
 }
@@ -69,6 +81,32 @@ export async function updateTask(userId: string, taskId: string, updates: any) {
   const taskRef = doc(db, "users", userId, "tasks", taskId)
   await updateDoc(taskRef, {
     ...updates,
+    updatedAt: Timestamp.now(),
+  })
+}
+
+export async function addRevisionToTask(userId: string, taskId: string, revision: any) {
+  const taskRef = doc(db, "users", userId, "tasks", taskId)
+  const taskDoc = await getDoc(taskRef)
+  
+  if (!taskDoc.exists()) {
+    throw new Error("Task not found")
+  }
+  
+  const taskData = taskDoc.data()
+  const existingRevisions = taskData.revisions || []
+  
+  const newRevision = {
+    ...revision,
+    id: revision.id || `rev_${Date.now()}`,
+    createdAt: Timestamp.now()
+  }
+  
+  await updateDoc(taskRef, {
+    revisions: [...existingRevisions, newRevision],
+    overallBand: revision.overallBand,
+    summary: revision.summary,
+    feedback: revision.feedback,
     updatedAt: Timestamp.now(),
   })
 }

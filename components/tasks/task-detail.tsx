@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, RefreshCw, Edit } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/auth-provider"
-import { getTask } from "@/lib/firebase-firestore"
-import type { CriterionKey, TaskDocument, TaskFeedback } from "@/types/tasks"
+import { getTask, addRevisionToTask } from "@/lib/firebase-firestore"
+import type { CriterionKey, TaskDocument, TaskFeedback, LineLevelFeedback } from "@/types/tasks"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Textarea } from "@/components/ui/textarea"
+import { format } from "date-fns"
 
 interface TaskDetailProps {
   taskId: string
@@ -21,9 +23,14 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const { toast } = useToast()
   const { user, loading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<CriterionKey>("TR")
+  const [feedbackTab, setFeedbackTab] = useState<"sentence" | "paragraph">("sentence")
   const [task, setTask] = useState<TaskDocument | null>(null)
   const [loadingTask, setLoadingTask] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedResponse, setEditedResponse] = useState("")
+  const [isRevaluating, setIsRevaluating] = useState(false)
+  const [highlightedFeedback, setHighlightedFeedback] = useState<LineLevelFeedback | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -43,6 +50,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         if (!isMounted) return
         const typedTask = data as TaskDocument | null
         setTask(typedTask)
+        setEditedResponse(typedTask?.response || "")
 
         const criteriaKeys = typedTask?.feedback?.criteria
           ? (Object.keys(typedTask.feedback.criteria) as CriterionKey[])
@@ -69,6 +77,58 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       isMounted = false
     }
   }, [authLoading, taskId, user])
+
+  const handleRevaluate = async () => {
+    if (!user || !task) return
+    
+    setIsRevaluating(true)
+    try {
+      const response = await fetch("/api/essays/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          essayText: editedResponse,
+          taskType: task.taskType,
+          promptText: task.prompt,
+          userId: user.uid,
+          promptId: task.promptId,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data?.feedback) {
+        throw new Error(data?.error || "Failed to re-evaluate essay")
+      }
+
+      // Add the new revision to the task
+      await addRevisionToTask(user.uid, taskId, {
+        id: data.revisionId,
+        overallBand: data.feedback.overallBand,
+        summary: data.feedback.summary,
+        feedback: data.feedback,
+      })
+
+      // Refresh task data
+      const updatedTask = await getTask(user.uid, taskId)
+      setTask(updatedTask as TaskDocument)
+      setIsEditing(false)
+
+      toast({
+        title: "Re-evaluation complete",
+        description: "Your essay has been re-scored successfully.",
+      })
+    } catch (error: any) {
+      console.error("[v0] Re-evaluation failed:", error)
+      toast({
+        title: "Re-evaluation failed",
+        description: error.message || "Unable to re-evaluate essay. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRevaluating(false)
+    }
+  }
 
   const handleCopy = () => {
     if (!task?.response) {
@@ -220,20 +280,145 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Your Response</CardTitle>
-                <Button variant="ghost" size="icon" onClick={handleCopy} disabled={!task.response}>
-                  <Copy className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-2">
+                  {!isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit & Re-evaluate
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" onClick={handleCopy} disabled={!task.response}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg mt-2">
                 <strong>Prompt:</strong> {task.prompt || "No prompt provided"}
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{task.response}</div>
-              </div>
+            <CardContent className="space-y-4">
+              {isEditing ? (
+                <>
+                  <Textarea
+                    value={editedResponse}
+                    onChange={(e) => setEditedResponse(e.target.value)}
+                    className="min-h-[300px] font-mono text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleRevaluate}
+                      disabled={isRevaluating || !editedResponse.trim()}
+                    >
+                      {isRevaluating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Re-evaluating...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Re-evaluate
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditing(false)
+                        setEditedResponse(task.response || "")
+                      }}
+                      disabled={isRevaluating}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="prose prose-sm max-w-none">
+                  <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
+                    {task.response}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Line-Level Feedback Panel */}
+          {task.feedback?.lineLevelFeedback && task.feedback.lineLevelFeedback.length > 0 && (
+            <Card className="rounded-2xl border-border bg-card">
+              <CardHeader>
+                <CardTitle>Error & Improvement Suggestions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={feedbackTab} onValueChange={(v) => setFeedbackTab(v as "sentence" | "paragraph")}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="sentence">Sentence-level Feedback</TabsTrigger>
+                    <TabsTrigger value="paragraph">Suggested Improvements</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="sentence" className="space-y-2 mt-4">
+                    {task.feedback.lineLevelFeedback.map((feedback, index) => {
+                      const excerpt = task.response?.substring(feedback.startIndex, feedback.endIndex) || ""
+                      const categoryColors = {
+                        grammar: "border-red-500 bg-red-50 dark:bg-red-950",
+                        lexical: "border-yellow-500 bg-yellow-50 dark:bg-yellow-950",
+                        coherence: "border-blue-500 bg-blue-50 dark:bg-blue-950",
+                        task_response: "border-purple-500 bg-purple-50 dark:bg-purple-950",
+                      }
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-lg border-l-4 ${categoryColors[feedback.category]} cursor-pointer hover:shadow-md transition-shadow`}
+                          onClick={() => setHighlightedFeedback(feedback)}
+                          onMouseEnter={() => setHighlightedFeedback(feedback)}
+                          onMouseLeave={() => setHighlightedFeedback(null)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {feedback.category.replace("_", " ")}
+                                </Badge>
+                              </div>
+                              <p className="text-sm font-mono text-muted-foreground mb-2">
+                                "{excerpt}"
+                              </p>
+                              <p className="text-sm mb-2">{feedback.comment}</p>
+                              {feedback.suggestedRewrite && (
+                                <div className="mt-2 p-2 bg-background rounded">
+                                  <p className="text-xs text-muted-foreground mb-1">Suggested rewrite:</p>
+                                  <p className="text-sm font-mono text-success">"{feedback.suggestedRewrite}"</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </TabsContent>
+                  
+                  <TabsContent value="paragraph" className="space-y-3 mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      <p className="mb-3">Based on the line-level feedback, here are key improvements to focus on:</p>
+                      <ul className="space-y-2">
+                        {task.feedback.actionItems?.map((item, index) => (
+                          <li key={index} className="flex items-start gap-2">
+                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Revisions Timeline */}
           <Card className="rounded-2xl border-border bg-card">
@@ -241,9 +426,35 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
               <CardTitle>Revisions Timeline</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                No revisions have been recorded for this task yet.
-              </div>
+              {!task.revisions || task.revisions.length === 0 ? (
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  No revisions have been recorded for this task yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {task.revisions.map((revision, index) => (
+                    <div
+                      key={revision.id}
+                      className="p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Revision {task.revisions!.length - index}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {revision.createdAt && typeof revision.createdAt.toDate === 'function'
+                              ? format(revision.createdAt.toDate(), "MMM d, yyyy 'at' h:mm a")
+                              : "Recent"}
+                          </span>
+                        </div>
+                        <Badge variant="default" className="text-sm">
+                          Band {revision.overallBand.toFixed(1)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{revision.summary}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -259,9 +470,14 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                 <div className="text-6xl font-bold text-primary mb-2">
                   {typeof overallBand === "number" ? overallBand.toFixed(1) : "-"}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-3">
                   {task.summary || task.feedback?.summary || "Submit your task to receive a full IELTS assessment."}
                 </p>
+                {task.updatedAt && typeof task.updatedAt.toDate === 'function' && (
+                  <p className="text-xs text-muted-foreground">
+                    Last updated: {format(task.updatedAt.toDate(), "MMM d, yyyy 'at' h:mm a")}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

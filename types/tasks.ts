@@ -2,6 +2,16 @@ import type { Timestamp } from "firebase/firestore"
 
 export type CriterionKey = "TR" | "CC" | "LR" | "GRA"
 
+export type FeedbackCategory = "grammar" | "lexical" | "coherence" | "task_response"
+
+export interface LineLevelFeedback {
+  startIndex: number
+  endIndex: number
+  category: FeedbackCategory
+  comment: string
+  suggestedRewrite?: string
+}
+
 export interface CriterionFeedback {
   score: number
   strengths: string[]
@@ -15,12 +25,22 @@ export interface TaskFeedback {
   summary: string
   criteria: Record<CriterionKey, CriterionFeedback>
   actionItems: string[]
+  lineLevelFeedback?: LineLevelFeedback[]
+}
+
+export interface Revision {
+  id: string
+  overallBand: number
+  summary: string
+  createdAt: Timestamp
+  feedback?: TaskFeedback
 }
 
 export interface TaskDocument {
   id: string
   title?: string
   prompt?: string
+  promptId?: string | null
   taskType?: string
   response?: string
   status?: string
@@ -29,6 +49,7 @@ export interface TaskDocument {
   wordCount?: number
   summary?: string
   actionItems?: string[]
+  revisions?: Revision[]
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }
