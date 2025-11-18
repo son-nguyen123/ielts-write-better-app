@@ -12,6 +12,8 @@ import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
 import type { TaskFeedback } from "@/types/tasks"
+import { queueAIRequest } from "@/lib/request-queue"
+import { AIQueueIndicator } from "@/components/ui/ai-queue-indicator"
 import {
   Dialog,
   DialogContent,
@@ -131,35 +133,37 @@ export function NewTaskForm() {
         return
       }
 
-      const scoringResponse = await fetch("/api/ai/score-essay", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          essay: response,
-          taskType,
-          prompt: resolvedPrompt,
-        }),
-      })
-
-      const scoringData = await scoringResponse.json().catch(() => null)
-
-      if (!scoringResponse.ok || !scoringData?.feedback) {
-        // Check for rate limit errors
-        let errorTitle = "Scoring failed"
-        let errorMessage = scoringData?.error || "Failed to score essay. Please try again."
-        
-        if (scoringResponse.status === 429 || scoringData?.errorType === "RATE_LIMIT") {
-          errorTitle = "Vượt giới hạn sử dụng"
-          errorMessage = scoringData?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        }
-        
-        toast({
-          title: errorTitle,
-          description: errorMessage,
-          variant: "destructive",
+      // Use request queue to manage AI calls and prevent rate limiting
+      const scoringData = await queueAIRequest(async () => {
+        const scoringResponse = await fetch("/api/ai/score-essay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            essay: response,
+            taskType,
+            prompt: resolvedPrompt,
+          }),
         })
-        return
-      }
+
+        const data = await scoringResponse.json().catch(() => null)
+
+        if (!scoringResponse.ok || !data?.feedback) {
+          // Check for rate limit errors
+          let errorTitle = "Scoring failed"
+          let errorMessage = data?.error || "Failed to score essay. Please try again."
+          
+          if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
+            errorTitle = "Vượt giới hạn sử dụng"
+            errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+          }
+          
+          const error: any = new Error(errorMessage)
+          error.title = errorTitle
+          throw error
+        }
+
+        return data
+      })
 
       const feedback: TaskFeedback = scoringData.feedback
 
@@ -182,11 +186,11 @@ export function NewTaskForm() {
         description: "Your task has been scored successfully.",
       })
       router.push(`/tasks/${taskId}`)
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error submitting task:", error)
       toast({
-        title: "Error",
-        description: "Failed to submit task. Please try again.",
+        title: error?.title || "Error",
+        description: error?.message || "Failed to submit task. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -348,6 +352,9 @@ export function NewTaskForm() {
                 )}
               </Button>
             </div>
+
+            {/* Queue Status Indicator */}
+            <AIQueueIndicator />
           </CardContent>
         </Card>
       </div>
