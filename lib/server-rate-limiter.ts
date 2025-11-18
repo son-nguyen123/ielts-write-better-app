@@ -103,13 +103,16 @@ let geminiRateLimiter: ServerRateLimiter | null = null
  * Get or create the global Gemini rate limiter
  * Conservative settings to avoid hitting quota limits:
  * - Max 1 concurrent request
- * - Minimum 3 seconds between requests (20 RPM max)
+ * - Minimum 4 seconds between requests (15 RPM max)
+ * 
+ * Note: gemini-2.0-flash-exp has higher limits than pro models,
+ * but we keep conservative settings to ensure stability
  */
 export function getGeminiRateLimiter(): ServerRateLimiter {
   if (!geminiRateLimiter) {
     geminiRateLimiter = new ServerRateLimiter({
       maxConcurrent: 1,
-      minInterval: 3000, // 3 seconds = max 20 requests per minute (well below typical limits)
+      minInterval: 4000, // 4 seconds = max 15 requests per minute (conservative for stability)
     })
   }
   return geminiRateLimiter

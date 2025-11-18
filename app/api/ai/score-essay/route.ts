@@ -79,22 +79,26 @@ Please provide your IELTS evaluation.`
   } catch (error: any) {
     console.error("[score-essay] Error:", error)
     
-    // Log additional context for debugging
-    console.error("[score-essay] Error details:", {
+    // Log detailed error information for debugging
+    console.error("[score-essay] Raw error details:", {
       status: error?.status,
+      responseStatus: error?.response?.status,
+      responseData: error?.response?.data,
       message: error?.message,
       timestamp: new Date().toISOString(),
     })
     
-    // Check for rate limit / quota errors
+    // Check for rate limit / quota errors with more precise detection
     const errorMessage = error?.message || error?.toString() || ""
+    const errorString = errorMessage.toLowerCase()
+    
+    // More precise rate limit detection - avoid false positives
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorMessage.toLowerCase().includes("quota") ||
-      errorMessage.toLowerCase().includes("rate limit") ||
-      errorMessage.includes("429")
+      errorString.includes("resource_exhausted") ||
+      errorString.includes("too many requests") ||
+      (errorString.includes("rate limit") && !errorString.includes("unlimited"))
     
     if (isRateLimitError) {
       return Response.json({ 
