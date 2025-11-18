@@ -93,6 +93,27 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
-    return NextResponse.json({ error: err?.message ?? "Failed to process chat" }, { status: 500 })
+    
+    // Check for rate limit / quota errors
+    const errorMessage = err?.message || err?.toString() || ""
+    const isRateLimitError = 
+      err?.status === 429 ||
+      err?.response?.status === 429 ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.includes("429")
+    
+    if (isRateLimitError) {
+      return NextResponse.json({ 
+        error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        errorType: "RATE_LIMIT"
+      }, { status: 429 })
+    }
+    
+    return NextResponse.json({ 
+      error: err?.message ?? "Failed to process chat",
+      errorType: "GENERIC"
+    }, { status: 500 })
   }
 }

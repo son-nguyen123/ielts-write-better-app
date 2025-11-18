@@ -48,8 +48,29 @@ Focus on: subject-verb agreement, tense consistency, article usage, prepositions
     )
 
     return Response.json({ issues: object.issues })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[v0] Error checking grammar:", error)
-    return Response.json({ error: "Failed to check grammar" }, { status: 500 })
+    
+    // Check for rate limit / quota errors
+    const errorMessage = error?.message || error?.toString() || ""
+    const isRateLimitError = 
+      error?.status === 429 ||
+      error?.response?.status === 429 ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.includes("429")
+    
+    if (isRateLimitError) {
+      return Response.json({ 
+        error: "AI kiểm tra ngữ pháp đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        errorType: "RATE_LIMIT"
+      }, { status: 429 })
+    }
+    
+    return Response.json({ 
+      error: "Failed to check grammar",
+      errorType: "GENERIC"
+    }, { status: 500 })
   }
 }

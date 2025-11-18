@@ -25,6 +25,25 @@ export function ParaphraseTool() {
       })
 
       const data = await response.json()
+      
+      if (!response.ok) {
+        // Check for rate limit errors
+        if (response.status === 429 || data?.errorType === "RATE_LIMIT") {
+          toast({
+            title: "Vượt giới hạn sử dụng",
+            description: data?.error || "AI diễn giải đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: data?.error || "Failed to generate paraphrases. Please try again.",
+            variant: "destructive",
+          })
+        }
+        return
+      }
+      
       if (data.paraphrases) {
         setParaphrases(data.paraphrases)
       }

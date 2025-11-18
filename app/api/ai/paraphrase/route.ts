@@ -46,8 +46,29 @@ Each paraphrase should maintain the original meaning while demonstrating the spe
     )
 
     return Response.json({ paraphrases: object.paraphrases })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[v0] Error generating paraphrases:", error)
-    return Response.json({ error: "Failed to generate paraphrases" }, { status: 500 })
+    
+    // Check for rate limit / quota errors
+    const errorMessage = error?.message || error?.toString() || ""
+    const isRateLimitError = 
+      error?.status === 429 ||
+      error?.response?.status === 429 ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.includes("429")
+    
+    if (isRateLimitError) {
+      return Response.json({ 
+        error: "AI diễn giải đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        errorType: "RATE_LIMIT"
+      }, { status: 429 })
+    }
+    
+    return Response.json({ 
+      error: "Failed to generate paraphrases",
+      errorType: "GENERIC"
+    }, { status: 500 })
   }
 }

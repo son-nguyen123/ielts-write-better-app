@@ -144,9 +144,17 @@ export function NewTaskForm() {
       const scoringData = await scoringResponse.json().catch(() => null)
 
       if (!scoringResponse.ok || !scoringData?.feedback) {
-        const errorMessage = scoringData?.error || "Failed to score essay. Please try again."
+        // Check for rate limit errors
+        let errorTitle = "Scoring failed"
+        let errorMessage = scoringData?.error || "Failed to score essay. Please try again."
+        
+        if (scoringResponse.status === 429 || scoringData?.errorType === "RATE_LIMIT") {
+          errorTitle = "Vượt giới hạn sử dụng"
+          errorMessage = scoringData?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+        }
+        
         toast({
-          title: "Scoring failed",
+          title: errorTitle,
           description: errorMessage,
           variant: "destructive",
         })
