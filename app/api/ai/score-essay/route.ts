@@ -126,9 +126,9 @@ function extractCriteria(text: string): any {
 function extractCriterionScore(text: string, code: string, name: string): any {
   // Look for patterns like "TR (Task Response): 7" or "- TR: 7"
   const patterns = [
-    new RegExp(`-?\\s*${code}\\s*\\([^)]+\\)[:\\s]+(\d+(?:\.\d+)?)`, 'i'),
-    new RegExp(`-?\\s*${code}[:\\s]+(\d+(?:\.\d+)?)`, 'i'),
-    new RegExp(`${name}[:\\s]+(\d+(?:\.\d+)?)`, 'i'),
+    new RegExp(`-?\\s*${code}\\s*\\([^)]+\\)[:\\s]+(\\d+(?:\\.\\d+)?)`, 'i'),
+    new RegExp(`-?\\s*${code}[:\\s]+(\\d+(?:\\.\\d+)?)`, 'i'),
+    new RegExp(`${name}[:\\s]+(\\d+(?:\\.\\d+)?)`, 'i'),
   ]
   
   for (const pattern of patterns) {
