@@ -72,9 +72,31 @@ Please provide your IELTS evaluation.`
     }
 
     return Response.json({ feedback })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[score-essay] Error:", error)
-    return Response.json({ error: error instanceof Error ? error.message : "Failed to score essay" }, { status: 500 })
+    
+    // Check for rate limit / quota errors
+    const errorMessage = error?.message || error?.toString() || ""
+    const isRateLimitError = 
+      error?.status === 429 ||
+      error?.response?.status === 429 ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.includes("429")
+    
+    if (isRateLimitError) {
+      return Response.json({ 
+        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        errorType: "RATE_LIMIT"
+      }, { status: 429 })
+    }
+    
+    // Generic error
+    return Response.json({ 
+      error: error instanceof Error ? error.message : "Failed to score essay",
+      errorType: "GENERIC"
+    }, { status: 500 })
   }
 }
 

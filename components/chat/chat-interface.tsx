@@ -118,9 +118,22 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
+      
+      // Check if it's a rate limit error
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const isRateLimitError = 
+        errorMessage.toLowerCase().includes("vượt giới hạn") ||
+        errorMessage.toLowerCase().includes("rate limit") ||
+        errorMessage.toLowerCase().includes("quota") ||
+        errorMessage.toLowerCase().includes("too many requests")
+      
+      const responseMessage = isRateLimitError 
+        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+        : "Sorry, I encountered an error. Please try again."
+      
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
+        { role: "assistant", content: responseMessage },
       ])
     } finally {
       setIsLoading(false)
