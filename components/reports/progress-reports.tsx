@@ -5,10 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, AlertCircle, Loader2 } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
 import { RadarChart } from "@/components/dashboard/radar-chart"
 import { useAuth } from "@/lib/firebase-auth"
 import type { ProgressReportData } from "@/types/reports"
+
+// Criteria full names for better clarity
+const CRITERIA_NAMES = {
+  TR: "Task Response",
+  CC: "Coherence & Cohesion",
+  LR: "Lexical Resource",
+  GRA: "Grammar & Accuracy"
+}
 
 interface ProgressReportsProps {
   userId?: string
@@ -108,12 +116,34 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
     const week = item.week
     return {
       date: `Week ${week}`,
-      TR: reportData.criteriaTrends.TR.find(d => d.week === week)?.score || 0,
-      CC: reportData.criteriaTrends.CC.find(d => d.week === week)?.score || 0,
-      LR: reportData.criteriaTrends.LR.find(d => d.week === week)?.score || 0,
-      GRA: reportData.criteriaTrends.GRA.find(d => d.week === week)?.score || 0,
+      "Task Response": reportData.criteriaTrends.TR.find(d => d.week === week)?.score || 0,
+      "Coherence & Cohesion": reportData.criteriaTrends.CC.find(d => d.week === week)?.score || 0,
+      "Lexical Resource": reportData.criteriaTrends.LR.find(d => d.week === week)?.score || 0,
+      "Grammar & Accuracy": reportData.criteriaTrends.GRA.find(d => d.week === week)?.score || 0,
     }
   })
+
+  // Custom tooltip for better context
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+          <p className="font-semibold mb-2">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-muted-foreground">{entry.name}:</span>
+              <span className="font-semibold">{entry.value.toFixed(1)}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
 
   const trendValue = reportData.overallScoreTrendValue
   const isPositive = trendValue.startsWith("+")
@@ -144,42 +174,52 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Overall Score Trend</CardTitle>
-                  <CardDescription>Your average band score over time</CardDescription>
+                  <CardTitle className="text-2xl">Overall Score Trend</CardTitle>
+                  <CardDescription className="text-base mt-1">Your average band score over time</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {isPositive ? (
-                    <TrendingUp className="h-5 w-5 text-success" />
+                    <TrendingUp className="h-6 w-6 text-success" />
                   ) : isNegative ? (
-                    <TrendingDown className="h-5 w-5 text-destructive" />
+                    <TrendingDown className="h-6 w-6 text-destructive" />
                   ) : (
-                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                    <TrendingUp className="h-6 w-6 text-muted-foreground" />
                   )}
-                  <span className={`text-2xl font-bold ${isPositive ? "text-success" : isNegative ? "text-destructive" : "text-muted-foreground"}`}>
-                    {trendValue.split(" ")[0]}
-                  </span>
-                  <span className="text-sm text-muted-foreground">since start</span>
+                  <div className="text-right">
+                    <div className={`text-3xl font-bold ${isPositive ? "text-success" : isNegative ? "text-destructive" : "text-muted-foreground"}`}>
+                      {trendValue.split(" ")[0]}
+                    </div>
+                    <span className="text-sm text-muted-foreground">since start</span>
+                  </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={overallTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={overallTrendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
+                    tickLine={{ stroke: "hsl(var(--border))" }}
+                  />
                   <YAxis
-                    domain={[5, 9]}
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    label={{ value: "Band Score", angle: -90, position: "insideLeft" }}
+                    domain={[0, 9]}
+                    ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
+                    tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
+                    tickLine={{ stroke: "hsl(var(--border))" }}
+                    label={{ value: "Band Score", angle: -90, position: "insideLeft", style: { fill: "hsl(var(--foreground))", fontSize: 14 } }}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="score" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={3} 
+                    dot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                    activeDot={{ r: 7 }}
+                    name="Overall Score"
                   />
-                  <Line type="monotone" dataKey="score" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -189,10 +229,10 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             {/* Criteria Radar */}
             <Card className="rounded-2xl border-border bg-card">
               <CardHeader>
-                <CardTitle>Criteria Breakdown</CardTitle>
-                <CardDescription>Current performance across all criteria</CardDescription>
+                <CardTitle className="text-xl">Criteria Breakdown</CardTitle>
+                <CardDescription className="text-base">Current performance across all criteria</CardDescription>
                 <Tabs value={dateRange} onValueChange={(value) => setDateRange(value as "7" | "30" | "90")} className="mt-4">
-                  <TabsList>
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="7">7 days</TabsTrigger>
                     <TabsTrigger value="30">30 days</TabsTrigger>
                     <TabsTrigger value="90">90 days</TabsTrigger>
@@ -208,14 +248,32 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                     GRA: reportData.criteriaBreakdown.GRA
                   }}
                 />
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-chart-1"></div>
+                    <span className="text-xs text-muted-foreground">TR - Task Response</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-chart-2"></div>
+                    <span className="text-xs text-muted-foreground">CC - Coherence & Cohesion</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-chart-3"></div>
+                    <span className="text-xs text-muted-foreground">LR - Lexical Resource</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-chart-4"></div>
+                    <span className="text-xs text-muted-foreground">GRA - Grammar & Accuracy</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             {/* Common Issues */}
             <Card className="rounded-2xl border-border bg-card">
               <CardHeader>
-                <CardTitle>Common Issues</CardTitle>
-                <CardDescription>Top recurring problems in your writing</CardDescription>
+                <CardTitle className="text-xl">Common Issues</CardTitle>
+                <CardDescription className="text-base">Top recurring problems in your writing</CardDescription>
               </CardHeader>
               <CardContent>
                 {reportData.commonIssues.length === 0 ? (
@@ -223,9 +281,9 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                     No issues identified yet. Keep writing to get more insights!
                   </p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {reportData.commonIssues.map((item, index) => (
-                      <div key={index} className="flex items-center gap-3 pb-4 border-b border-border last:border-0">
+                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <AlertCircle className="h-4 w-4 text-warning" />
@@ -233,18 +291,18 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                           </div>
                           <p className="text-xs text-muted-foreground">Occurred {item.count} times</p>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           {item.trend === "Improving" ? (
                             <>
                               <TrendingDown className="h-4 w-4 text-success" />
-                              <Badge variant="success" className="text-xs">
+                              <Badge variant="success" className="text-xs bg-success/20 text-success border-success/30">
                                 Improving
                               </Badge>
                             </>
                           ) : item.trend === "Worsening" ? (
                             <>
                               <TrendingUp className="h-4 w-4 text-destructive" />
-                              <Badge variant="destructive" className="text-xs">
+                              <Badge variant="destructive" className="text-xs bg-destructive/20 text-destructive border-destructive/30">
                                 Worsening
                               </Badge>
                             </>
@@ -266,31 +324,63 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           {criteriaData.length > 0 && (
             <Card className="rounded-2xl border-border bg-card mb-6">
               <CardHeader>
-                <CardTitle>Criteria Trends</CardTitle>
-                <CardDescription>Track individual criteria performance over time</CardDescription>
+                <CardTitle className="text-2xl">Criteria Trends</CardTitle>
+                <CardDescription className="text-base">Track individual criteria performance over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={350}>
-                  <LineChart data={criteriaData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={criteriaData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
+                      tickLine={{ stroke: "hsl(var(--border))" }}
+                    />
                     <YAxis
-                      domain={[5, 9]}
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                      label={{ value: "Band Score", angle: -90, position: "insideLeft" }}
+                      domain={[0, 9]}
+                      ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
+                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
+                      tickLine={{ stroke: "hsl(var(--border))" }}
+                      label={{ value: "Band Score", angle: -90, position: "insideLeft", style: { fill: "hsl(var(--foreground))", fontSize: 14 } }}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: "20px" }}
+                      iconType="line"
+                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Legend />
-                    <Line type="monotone" dataKey="TR" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                    <Line type="monotone" dataKey="CC" stroke="hsl(var(--chart-2))" strokeWidth={2} />
-                    <Line type="monotone" dataKey="LR" stroke="hsl(var(--chart-3))" strokeWidth={2} />
-                    <Line type="monotone" dataKey="GRA" stroke="hsl(var(--chart-4))" strokeWidth={2} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="Task Response" 
+                      stroke="hsl(var(--chart-1))" 
+                      strokeWidth={3} 
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="Coherence & Cohesion" 
+                      stroke="hsl(var(--chart-2))" 
+                      strokeWidth={3} 
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="Lexical Resource" 
+                      stroke="hsl(var(--chart-3))" 
+                      strokeWidth={3} 
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="Grammar & Accuracy" 
+                      stroke="hsl(var(--chart-4))" 
+                      strokeWidth={3} 
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -300,28 +390,28 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           {/* Practice Time */}
           <Card className="rounded-2xl border-border bg-card mb-6">
             <CardHeader>
-              <CardTitle>Practice Time</CardTitle>
-              <CardDescription>Your writing activity this period</CardDescription>
+              <CardTitle className="text-2xl">Practice Time</CardTitle>
+              <CardDescription className="text-base">Your writing activity this period</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid sm:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-primary mb-2">
+                <div className="text-center p-4 rounded-xl bg-primary/10 border border-primary/20">
+                  <div className="text-5xl font-bold text-primary mb-2">
                     {reportData.practiceTime.hoursThisWeek}
                   </div>
-                  <p className="text-sm text-muted-foreground">Hours this week</p>
+                  <p className="text-sm font-medium text-muted-foreground">Hours this week</p>
                 </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-accent mb-2">
+                <div className="text-center p-4 rounded-xl bg-accent/10 border border-accent/20">
+                  <div className="text-5xl font-bold text-accent mb-2">
                     {reportData.practiceTime.hoursThisMonth}
                   </div>
-                  <p className="text-sm text-muted-foreground">Hours this month</p>
+                  <p className="text-sm font-medium text-muted-foreground">Hours this month</p>
                 </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-chart-3 mb-2">
+                <div className="text-center p-4 rounded-xl bg-chart-3/10 border border-chart-3/20">
+                  <div className="text-5xl font-bold text-chart-3 mb-2">
                     {reportData.practiceTime.tasksCompleted}
                   </div>
-                  <p className="text-sm text-muted-foreground">Tasks completed</p>
+                  <p className="text-sm font-medium text-muted-foreground">Tasks completed</p>
                 </div>
               </div>
             </CardContent>
