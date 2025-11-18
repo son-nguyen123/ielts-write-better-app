@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     const allTasks = (await getTasks(userId)) as TaskDocument[]
     
     // Filter tasks that have been scored (have overallBand)
+    // Note: We don't filter by status because scored tasks can have different status values
     const scoredTasks = allTasks.filter(task => 
       task.overallBand !== undefined && 
       task.createdAt
