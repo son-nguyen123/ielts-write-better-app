@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 import { Loader2, Sparkles, Send } from "lucide-react"
 
 export function EssayPlanner() {
+  const { toast } = useToast()
   const [topic, setTopic] = useState("")
   const [targetBand, setTargetBand] = useState("7.0")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -24,11 +26,31 @@ export function EssayPlanner() {
       })
 
       const data = await response.json()
+      
+      if (!response.ok) {
+        // Check for rate limit errors
+        const errorMessage = response.status === 429 || data?.errorType === "RATE_LIMIT"
+          ? data?.error || "AI tạo dàn ý đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+          : data?.error || "Failed to generate outline. Please try again."
+        
+        toast({
+          title: response.status === 429 || data?.errorType === "RATE_LIMIT" ? "Vượt giới hạn sử dụng" : "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return
+      }
+      
       if (data.outline) {
         setOutline(data.outline)
       }
     } catch (error) {
       console.error("[v0] Error generating outline:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate outline. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsGenerating(false)
     }

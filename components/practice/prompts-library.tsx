@@ -57,11 +57,18 @@ export function PromptsLibrary() {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("Failed to generate prompts")
+        // Check for rate limit errors
+        if (response.status === 429 || data?.errorType === "RATE_LIMIT") {
+          toast.error(data?.error || "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
+        } else {
+          toast.error(data?.error || "Failed to generate prompts. Please try again.")
+        }
+        return
       }
 
-      const data = await response.json()
       setPrompts(data.prompts)
       toast.success("New prompts generated!")
     } catch (error) {
