@@ -18,6 +18,13 @@ interface RadarChartProps {
 
 const CRITERIA_ORDER: CriterionKey[] = ["TR", "CC", "LR", "GRA"]
 
+const CRITERIA_FULL_NAMES: Record<CriterionKey, string> = {
+  TR: "Task Response",
+  CC: "Coherence & Cohesion",
+  LR: "Lexical Resource",
+  GRA: "Grammar & Accuracy"
+}
+
 export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps) {
   if (isLoading) {
     return (
@@ -38,7 +45,7 @@ export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps)
   }
 
   const data = CRITERIA_ORDER.map((criterion) => ({
-    criteria: criterion,
+    criteria: CRITERIA_FULL_NAMES[criterion],
     current: scores?.[criterion] ?? 0,
     target,
   }))
@@ -46,17 +53,34 @@ export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps)
   return (
     <ResponsiveContainer width="100%" height={300}>
       <RechartsRadar data={data}>
-        <PolarGrid stroke="hsl(var(--border))" />
-        <PolarAngleAxis dataKey="criteria" tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }} />
-        <PolarRadiusAxis angle={90} domain={[0, 9]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+        <PolarGrid stroke="hsl(var(--border))" strokeWidth={1.5} />
+        <PolarAngleAxis 
+          dataKey="criteria" 
+          tick={{ fill: "hsl(var(--foreground))", fontSize: 11, fontWeight: 500 }} 
+        />
+        <PolarRadiusAxis 
+          angle={90} 
+          domain={[0, 9]} 
+          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+          tickCount={10}
+        />
         <Radar
-          name="Current"
+          name="Current Score"
           dataKey="current"
           stroke="hsl(var(--primary))"
           fill="hsl(var(--primary))"
-          fillOpacity={0.6}
+          fillOpacity={0.5}
+          strokeWidth={2}
         />
-        <Radar name="Target" dataKey="target" stroke="hsl(var(--accent))" fill="hsl(var(--accent))" fillOpacity={0.3} />
+        <Radar 
+          name="Target Score" 
+          dataKey="target" 
+          stroke="hsl(var(--accent))" 
+          fill="hsl(var(--accent))" 
+          fillOpacity={0.2}
+          strokeWidth={2}
+          strokeDasharray="5 5"
+        />
       </RechartsRadar>
     </ResponsiveContainer>
   )
