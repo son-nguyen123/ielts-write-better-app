@@ -12,8 +12,7 @@ import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
 import type { TaskFeedback } from "@/types/tasks"
-import { queueAIRequest } from "@/lib/request-queue"
-import { AIQueueIndicator } from "@/components/ui/ai-queue-indicator"
+
 import {
   Dialog,
   DialogContent,
@@ -133,38 +132,36 @@ export function NewTaskForm() {
         return
       }
 
-      // Use request queue to manage AI calls and prevent rate limiting
-      const scoringData = await queueAIRequest(async () => {
-        const scoringResponse = await fetch("/api/ai/score-essay", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            essay: response,
-            taskType,
-            prompt: resolvedPrompt,
-          }),
-        })
-
-        const data = await scoringResponse.json().catch(() => null)
-
-        if (!scoringResponse.ok || !data?.feedback) {
-          // Check for rate limit errors
-          let errorTitle = "Lỗi chấm điểm"
-          let errorMessage = data?.error || "Không thể chấm điểm bài viết. Vui lòng thử lại."
-          
-          if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
-            errorTitle = "Hệ thống đang bận"
-            errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang xử lý nhiều yêu cầu. Vui lòng thử lại sau 1-2 phút."
-          }
-          
-          const error: any = new Error(errorMessage)
-          error.title = errorTitle
-          error.retryable = scoringResponse.status === 429
-          throw error
-        }
-
-        return data
+      // Call the scoring API directly - server-side rate limiting handles queue management
+      const scoringResponse = await fetch("/api/ai/score-essay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          essay: response,
+          taskType,
+          prompt: resolvedPrompt,
+        }),
       })
+
+      const data = await scoringResponse.json().catch(() => null)
+
+      if (!scoringResponse.ok || !data?.feedback) {
+        // Check for rate limit errors
+        let errorTitle = "Lỗi chấm điểm"
+        let errorMessage = data?.error || "Không thể chấm điểm bài viết. Vui lòng thử lại."
+        
+        if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
+          errorTitle = "Hệ thống đang bận"
+          errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút."
+        }
+        
+        const error: any = new Error(errorMessage)
+        error.title = errorTitle
+        error.retryable = scoringResponse.status === 429
+        throw error
+      }
+
+      const scoringData = data
 
       const feedback: TaskFeedback = scoringData.feedback
 
@@ -363,9 +360,6 @@ export function NewTaskForm() {
                 )}
               </Button>
             </div>
-
-            {/* Queue Status Indicator */}
-            <AIQueueIndicator />
           </CardContent>
         </Card>
       </div>
