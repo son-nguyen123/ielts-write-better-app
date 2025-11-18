@@ -1,0 +1,393 @@
+// Analytics utilities for progress reports
+import type { TaskDocument, CriterionKey } from "@/types/tasks"
+import type { 
+  WeeklyScoreData, 
+  CriteriaScoreData, 
+  CommonIssue, 
+  CriteriaBreakdown,
+  PersonalizedFeedback 
+} from "@/types/reports"
+
+/**
+ * Calculate the number of days between two dates
+ */
+function getDaysDiff(date1: Date, date2: Date): number {
+  const diffTime = Math.abs(date2.getTime() - date1.getTime())
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
+/**
+ * Filter tasks within the specified date range
+ */
+export function filterTasksByDateRange(
+  tasks: TaskDocument[],
+  dateRange: 7 | 30 | 90
+): TaskDocument[] {
+  const now = new Date()
+  const cutoffDate = new Date(now.getTime() - dateRange * 24 * 60 * 60 * 1000)
+  
+  return tasks.filter(task => {
+    if (!task.createdAt) return false
+    const taskDate = task.createdAt.toDate()
+    return taskDate >= cutoffDate
+  })
+}
+
+/**
+ * Calculate overall score trend data grouped by weeks
+ */
+export function calculateOverallScoreTrend(tasks: TaskDocument[]): WeeklyScoreData[] {
+  if (tasks.length === 0) return []
+  
+  // Sort tasks by date
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (!a.createdAt || !b.createdAt) return 0
+    return a.createdAt.toMillis() - b.createdAt.toMillis()
+  })
+  
+  // Group by week
+  const weekMap = new Map<number, number[]>()
+  const firstDate = sortedTasks[0]?.createdAt?.toDate()
+  
+  if (!firstDate) return []
+  
+  sortedTasks.forEach(task => {
+    if (!task.createdAt || task.overallBand === undefined) return
+    
+    const taskDate = task.createdAt.toDate()
+    const weekNumber = Math.floor(getDaysDiff(firstDate, taskDate) / 7)
+    
+    if (!weekMap.has(weekNumber)) {
+      weekMap.set(weekNumber, [])
+    }
+    weekMap.get(weekNumber)!.push(task.overallBand)
+  })
+  
+  // Calculate average for each week
+  const result: WeeklyScoreData[] = []
+  weekMap.forEach((scores, week) => {
+    const average = scores.reduce((sum, score) => sum + score, 0) / scores.length
+    result.push({ week: week + 1, score: Math.round(average * 10) / 10 })
+  })
+  
+  return result.sort((a, b) => a.week - b.week)
+}
+
+/**
+ * Calculate criteria trends over time
+ */
+export function calculateCriteriaTrends(tasks: TaskDocument[]): {
+  TR: CriteriaScoreData[]
+  CC: CriteriaScoreData[]
+  LR: CriteriaScoreData[]
+  GRA: CriteriaScoreData[]
+} {
+  if (tasks.length === 0) {
+    return { TR: [], CC: [], LR: [], GRA: [] }
+  }
+  
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (!a.createdAt || !b.createdAt) return 0
+    return a.createdAt.toMillis() - b.createdAt.toMillis()
+  })
+  
+  const firstDate = sortedTasks[0]?.createdAt?.toDate()
+  if (!firstDate) return { TR: [], CC: [], LR: [], GRA: [] }
+  
+  const criteriaWeeks: Record<CriterionKey, Map<number, number[]>> = {
+    TR: new Map(),
+    CC: new Map(),
+    LR: new Map(),
+    GRA: new Map()
+  }
+  
+  sortedTasks.forEach(task => {
+    if (!task.createdAt || !task.feedback) return
+    
+    const taskDate = task.createdAt.toDate()
+    const weekNumber = Math.floor(getDaysDiff(firstDate, taskDate) / 7)
+    
+    ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(criterion => {
+      const score = task.feedback?.criteria?.[criterion]?.score
+      if (score !== undefined) {
+        if (!criteriaWeeks[criterion].has(weekNumber)) {
+          criteriaWeeks[criterion].set(weekNumber, [])
+        }
+        criteriaWeeks[criterion].get(weekNumber)!.push(score)
+      }
+    })
+  })
+  
+  // Calculate averages
+  const result: any = { TR: [], CC: [], LR: [], GRA: [] }
+  
+  ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(criterion => {
+    criteriaWeeks[criterion].forEach((scores, week) => {
+      const average = scores.reduce((sum, score) => sum + score, 0) / scores.length
+      result[criterion].push({ 
+        week: week + 1, 
+        score: Math.round(average * 10) / 10 
+      })
+    })
+    result[criterion].sort((a: any, b: any) => a.week - b.week)
+  })
+  
+  return result
+}
+
+/**
+ * Calculate criteria breakdown (average scores) for date range
+ */
+export function calculateCriteriaBreakdown(
+  tasks: TaskDocument[],
+  range: 7 | 30 | 90
+): CriteriaBreakdown {
+  const filteredTasks = filterTasksByDateRange(tasks, range)
+  
+  const criteriaScores: Record<CriterionKey, number[]> = {
+    TR: [],
+    CC: [],
+    LR: [],
+    GRA: []
+  }
+  
+  filteredTasks.forEach(task => {
+    if (!task.feedback) return
+    
+    ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(criterion => {
+      const score = task.feedback?.criteria?.[criterion]?.score
+      if (score !== undefined) {
+        criteriaScores[criterion].push(score)
+      }
+    })
+  })
+  
+  const rangeMap = { 7: "7d", 30: "30d", 90: "90d" } as const
+  
+  return {
+    range: rangeMap[range],
+    TR: calculateAverage(criteriaScores.TR),
+    CC: calculateAverage(criteriaScores.CC),
+    LR: calculateAverage(criteriaScores.LR),
+    GRA: calculateAverage(criteriaScores.GRA)
+  }
+}
+
+/**
+ * Extract common issues from tasks
+ */
+export function extractCommonIssues(
+  tasks: TaskDocument[],
+  dateRange: 7 | 30 | 90
+): CommonIssue[] {
+  const allTasks = filterTasksByDateRange(tasks, dateRange)
+  const halfRange = Math.floor(dateRange / 2)
+  const recentTasks = filterTasksByDateRange(tasks, halfRange as 7 | 30 | 90)
+  
+  // Count all issues
+  const issueCount = new Map<string, number>()
+  const recentIssueCount = new Map<string, number>()
+  
+  allTasks.forEach(task => {
+    if (!task.feedback) return
+    
+    ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(criterion => {
+      const issues = task.feedback?.criteria?.[criterion]?.issues || []
+      issues.forEach(issue => {
+        issueCount.set(issue, (issueCount.get(issue) || 0) + 1)
+      })
+    })
+  })
+  
+  recentTasks.forEach(task => {
+    if (!task.feedback) return
+    
+    ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(criterion => {
+      const issues = task.feedback?.criteria?.[criterion]?.issues || []
+      issues.forEach(issue => {
+        recentIssueCount.set(issue, (recentIssueCount.get(issue) || 0) + 1)
+      })
+    })
+  })
+  
+  // Convert to array and sort by count
+  const commonIssues: CommonIssue[] = []
+  issueCount.forEach((count, issue) => {
+    const recentCount = recentIssueCount.get(issue) || 0
+    const avgOlder = allTasks.length > recentTasks.length 
+      ? (count - recentCount) / (allTasks.length - recentTasks.length)
+      : 0
+    const avgRecent = recentTasks.length > 0 ? recentCount / recentTasks.length : 0
+    
+    let trend: "Improving" | "Worsening" | "Stable" = "Stable"
+    const difference = avgRecent - avgOlder
+    
+    if (difference < -0.1) {
+      trend = "Improving"
+    } else if (difference > 0.1) {
+      trend = "Worsening"
+    }
+    
+    commonIssues.push({ name: issue, count, trend })
+  })
+  
+  return commonIssues.sort((a, b) => b.count - a.count).slice(0, 5)
+}
+
+/**
+ * Generate personalized feedback based on scores and trends
+ */
+export function generatePersonalizedFeedback(
+  tasks: TaskDocument[],
+  criteriaBreakdown: CriteriaBreakdown,
+  commonIssues: CommonIssue[]
+): PersonalizedFeedback {
+  if (tasks.length === 0) {
+    return {
+      overallSummary: "No essays submitted yet. Start writing to get personalized feedback!",
+      strengths: [],
+      weaknesses: [],
+      recommendations: []
+    }
+  }
+  
+  // Calculate overall trend
+  const scoreTrend = calculateOverallScoreTrend(tasks)
+  const trendDirection = scoreTrend.length >= 2 
+    ? scoreTrend[scoreTrend.length - 1].score - scoreTrend[0].score 
+    : 0
+  
+  // Identify strengths (highest scoring criteria with positive trend)
+  const criteriaScores = [
+    { name: "TR", score: criteriaBreakdown.TR, label: "Task Response" },
+    { name: "CC", score: criteriaBreakdown.CC, label: "Coherence & Cohesion" },
+    { name: "LR", score: criteriaBreakdown.LR, label: "Lexical Resource" },
+    { name: "GRA", score: criteriaBreakdown.GRA, label: "Grammar & Accuracy" }
+  ].sort((a, b) => b.score - a.score)
+  
+  const strengths: string[] = []
+  const weaknesses: string[] = []
+  
+  // Top 2 criteria are strengths
+  if (criteriaScores[0].score >= 6.0) {
+    strengths.push(`Strong performance in ${criteriaScores[0].label} (${criteriaScores[0].score})`)
+  }
+  if (criteriaScores[1].score >= 6.0) {
+    strengths.push(`Good progress in ${criteriaScores[1].label} (${criteriaScores[1].score})`)
+  }
+  
+  // Bottom 2 criteria are weaknesses
+  if (criteriaScores[3].score < 7.0) {
+    weaknesses.push(`${criteriaScores[3].label} needs improvement (${criteriaScores[3].score})`)
+  }
+  if (criteriaScores[2].score < 7.0) {
+    weaknesses.push(`${criteriaScores[2].label} could be enhanced (${criteriaScores[2].score})`)
+  }
+  
+  // Add common issues to weaknesses
+  const worseningIssues = commonIssues.filter(issue => issue.trend === "Worsening")
+  if (worseningIssues.length > 0) {
+    weaknesses.push(`Increasing errors: ${worseningIssues[0].name}`)
+  }
+  
+  // Generate recommendations
+  const recommendations: PersonalizedFeedback["recommendations"] = []
+  
+  // Recommendation for weakest criterion
+  const weakest = criteriaScores[3]
+  if (weakest.score < 7.0) {
+    const criterionRecommendations: Record<string, any> = {
+      TR: {
+        title: "Improve Task Response",
+        description: "Practice addressing all parts of the question directly. Read the prompt carefully and ensure your essay stays on topic throughout.",
+        relatedCriterion: "TR" as const
+      },
+      CC: {
+        title: "Enhance Coherence & Cohesion",
+        description: "Work on paragraph structure and use more varied linking words. Ensure each paragraph has a clear topic sentence and supporting ideas.",
+        relatedCriterion: "CC" as const
+      },
+      LR: {
+        title: "Expand Vocabulary Range",
+        description: "Build your lexical resource by learning topic-specific vocabulary. Practice paraphrasing and using collocations appropriately.",
+        relatedCriterion: "LR" as const
+      },
+      GRA: {
+        title: "Strengthen Grammar Accuracy",
+        description: "Review complex sentence structures and reduce grammatical errors. Practice using conditional sentences and passive voice correctly.",
+        relatedCriterion: "GRA" as const
+      }
+    }
+    recommendations.push(criterionRecommendations[weakest.name])
+  }
+  
+  // Recommendation based on most common issue
+  if (commonIssues.length > 0) {
+    const topIssue = commonIssues[0].name.toLowerCase()
+    if (topIssue.includes("vocabulary")) {
+      recommendations.push({
+        title: "Address Vocabulary Range",
+        description: "Use the paraphrase tool to learn synonyms and practice using varied vocabulary in your essays.",
+        relatedCriterion: "LR"
+      })
+    } else if (topIssue.includes("grammar") || topIssue.includes("splice")) {
+      recommendations.push({
+        title: "Focus on Grammar Rules",
+        description: "Use the grammar checker tool regularly and review feedback carefully. Pay special attention to sentence structure.",
+        relatedCriterion: "GRA"
+      })
+    } else if (topIssue.includes("topic sentence") || topIssue.includes("coherence")) {
+      recommendations.push({
+        title: "Improve Essay Structure",
+        description: "Use the essay planner to organize your ideas before writing. Ensure each paragraph has a clear focus.",
+        relatedCriterion: "CC"
+      })
+    }
+  }
+  
+  // General practice recommendation
+  if (tasks.length < 10) {
+    recommendations.push({
+      title: "Increase Practice Volume",
+      description: "Try to write at least 2-3 essays per week to build consistency and improve faster.",
+      relatedCriterion: "Overall"
+    })
+  }
+  
+  // Overall summary
+  const overallSummary = trendDirection >= 0.5
+    ? `Great progress! Your overall score has improved by ${trendDirection.toFixed(1)} points. Keep up the good work and focus on the areas highlighted below.`
+    : trendDirection <= -0.5
+    ? `Your scores have declined slightly. Don't be discouraged - focus on the recommendations below to get back on track.`
+    : `Your performance is stable. To improve further, focus on the specific areas highlighted in the recommendations.`
+  
+  return {
+    overallSummary,
+    strengths: strengths.slice(0, 3),
+    weaknesses: weaknesses.slice(0, 3),
+    recommendations: recommendations.slice(0, 5)
+  }
+}
+
+/**
+ * Calculate average of an array of numbers
+ */
+function calculateAverage(numbers: number[]): number {
+  if (numbers.length === 0) return 0
+  const sum = numbers.reduce((acc, num) => acc + num, 0)
+  return Math.round((sum / numbers.length) * 10) / 10
+}
+
+/**
+ * Calculate overall score trend string (e.g., "+1.5 since start")
+ */
+export function calculateOverallTrendString(scoreTrend: WeeklyScoreData[]): string {
+  if (scoreTrend.length < 2) return "+0.0 since start"
+  
+  const firstScore = scoreTrend[0].score
+  const lastScore = scoreTrend[scoreTrend.length - 1].score
+  const diff = lastScore - firstScore
+  
+  const sign = diff >= 0 ? "+" : ""
+  return `${sign}${diff.toFixed(1)} since start`
+}
