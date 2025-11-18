@@ -1,44 +1,7 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
-import { z } from "zod"
 
 export const maxDuration = 60
-
-const feedbackSchema = z.object({
-  overallBand: z.number().min(0).max(9),
-  summary: z.string(),
-  criteria: z.object({
-    TR: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-    CC: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-    LR: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-    GRA: z.object({
-      score: z.number().min(0).max(9),
-      strengths: z.array(z.string()),
-      issues: z.array(z.string()),
-      suggestions: z.array(z.string()),
-      examples: z.array(z.string()),
-    }),
-  }),
-  actionItems: z.array(z.string()),
-})
 
 export async function POST(req: Request) {
   try {
@@ -48,54 +11,35 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const model = getGeminiModel("gemini-2.0-flash-exp")
+    const model = getGeminiModel()
 
-    const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
+    const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria.
 
-Task Response (TR): How well the essay addresses the task
-- For ${taskType}: Check if the essay directly responds to ALL parts of the prompt
-- Assess whether the essay stays on topic and doesn't deviate from the given prompt
-- Evaluate if the position/response is clear and well-developed
-- For Task 2: Check if both views are discussed if required, and opinion is clearly stated
-- PENALIZE essays that go off-topic or don't address the specific prompt given
+Provide your evaluation in this format:
 
-Coherence & Cohesion (CC): Organization and logical flow
-Lexical Resource (LR): Vocabulary range and accuracy
-Grammatical Range & Accuracy (GRA): Grammar complexity and correctness
+OVERALL BAND: [score 0-9]
 
-IMPORTANT: The Task Response (TR) score should heavily consider:
-1. Whether the essay addresses the SPECIFIC prompt given (not a different topic)
-2. Whether all parts of the task are answered
-3. Relevance to the topic throughout the essay
+SCORES:
+- TR (Task Response): [score 0-9]
+- CC (Coherence & Cohesion): [score 0-9]
+- LR (Lexical Resource): [score 0-9]
+- GRA (Grammatical Range & Accuracy): [score 0-9]
 
-Provide detailed, actionable feedback with specific examples from the text.
+SUMMARY:
+[Brief overall assessment]
 
-Return your response as a JSON object with this exact structure:
-{
-  "overallBand": number (0-9, can use .5 increments),
-  "summary": "brief overall assessment",
-  "criteria": {
-    "TR": {
-      "score": number (0-9),
-      "strengths": ["strength 1", "strength 2"],
-      "issues": ["issue 1", "issue 2"],
-      "suggestions": ["suggestion 1", "suggestion 2"],
-      "examples": ["example 1", "example 2"]
-    },
-    "CC": { same structure },
-    "LR": { same structure },
-    "GRA": { same structure }
-  },
-  "actionItems": ["action 1", "action 2", "action 3"]
-}`
+ACTION ITEMS:
+1. [First improvement suggestion]
+2. [Second improvement suggestion]
+3. [Third improvement suggestion]`
 
-    const userPrompt = `PROMPT (This is what the essay MUST respond to):
+    const userPrompt = `PROMPT:
 ${prompt}
 
-ESSAY SUBMISSION:
+ESSAY:
 ${essay}
 
-Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
+Please provide your IELTS evaluation.`
 
     const result = await retryWithBackoff(
       () =>
@@ -107,8 +51,8 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
             },
           ],
           generationConfig: {
-            temperature: 0.3,
-            responseMimeType: "application/json",
+            temperature: 0.7,
+            maxOutputTokens: 1500,
           },
         }),
       GEMINI_RETRY_CONFIG
@@ -117,24 +61,136 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     const response = result.response
     const text = response.text()
 
-    console.log("[v0] Raw Gemini response:", text)
+    console.log("[score-essay] AI response:", text)
 
-    // Parse and validate the JSON response
-    let parsedResponse
-    try {
-      parsedResponse = JSON.parse(text)
-    } catch (parseError) {
-      console.error("[v0] Failed to parse JSON:", parseError)
-      console.error("[v0] Response text:", text)
-      throw new Error("Invalid JSON response from AI")
+    // Parse the simple text response into a basic feedback structure
+    const feedback = {
+      overallBand: extractBandScore(text),
+      summary: extractSummary(text),
+      criteria: extractCriteria(text),
+      actionItems: extractActionItems(text),
     }
 
-    // Validate with Zod schema
-    const validatedFeedback = feedbackSchema.parse(parsedResponse)
-
-    return Response.json({ feedback: validatedFeedback })
+    return Response.json({ feedback })
   } catch (error) {
-    console.error("[v0] Error scoring essay:", error)
+    console.error("[score-essay] Error:", error)
     return Response.json({ error: error instanceof Error ? error.message : "Failed to score essay" }, { status: 500 })
   }
+}
+
+// Helper functions to parse the simple text response
+function extractBandScore(text: string): number {
+  // Look for "OVERALL BAND: X" or similar patterns
+  const overallMatch = text.match(/overall\s+band[:\s]+(\d+(?:\.\d+)?)/i)
+  if (overallMatch) {
+    const score = parseFloat(overallMatch[1])
+    return Math.min(9, Math.max(0, score))
+  }
+  
+  // Fallback: look for any score pattern
+  const match = text.match(/(?:overall|band|score)[:\s]+(\d+(?:\.\d+)?)/i)
+  if (match) {
+    const score = parseFloat(match[1])
+    return Math.min(9, Math.max(0, score))
+  }
+  return 6.0 // Default fallback
+}
+
+function extractSummary(text: string): string {
+  // Look for SUMMARY section
+  const summaryMatch = text.match(/SUMMARY[:\s]+(.+?)(?=ACTION ITEMS|$)/is)
+  if (summaryMatch) {
+    return summaryMatch[1].trim().split('\n')[0].trim()
+  }
+  
+  // Fallback: extract the first meaningful paragraph
+  const lines = text.split('\n').filter(line => line.trim() && !line.match(/^(OVERALL|SCORES|TR|CC|LR|GRA|ACTION)/i))
+  if (lines.length > 0) {
+    return lines[0].trim()
+  }
+  return "Your essay has been evaluated."
+}
+
+function extractCriteria(text: string): any {
+  // Extract scores for each criterion from the SCORES section
+  const criteria = {
+    TR: extractCriterionScore(text, 'TR', 'Task Response'),
+    CC: extractCriterionScore(text, 'CC', 'Coherence'),
+    LR: extractCriterionScore(text, 'LR', 'Lexical'),
+    GRA: extractCriterionScore(text, 'GRA', 'Grammar'),
+  }
+  
+  return criteria
+}
+
+function extractCriterionScore(text: string, code: string, name: string): any {
+  // Look for patterns like "TR (Task Response): 7" or "- TR: 7"
+  const patterns = [
+    new RegExp(`-?\\s*${code}\\s*\\([^)]+\\)[:\\s]+(\d+(?:\.\d+)?)`, 'i'),
+    new RegExp(`-?\\s*${code}[:\\s]+(\d+(?:\.\d+)?)`, 'i'),
+    new RegExp(`${name}[:\\s]+(\d+(?:\.\d+)?)`, 'i'),
+  ]
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match) {
+      const score = Math.min(9, Math.max(0, parseFloat(match[1])))
+      return {
+        score,
+        strengths: [],
+        issues: [],
+        suggestions: [],
+        examples: [],
+      }
+    }
+  }
+  
+  // Default fallback
+  return {
+    score: 6.0,
+    strengths: [],
+    issues: [],
+    suggestions: [],
+    examples: [],
+  }
+}
+
+function extractActionItems(text: string): string[] {
+  const items: string[] = []
+  
+  // Look for ACTION ITEMS section
+  const actionMatch = text.match(/ACTION ITEMS[:\s]+(.+?)$/is)
+  if (actionMatch) {
+    const actionText = actionMatch[1]
+    const lines = actionText.split('\n')
+    
+    for (const line of lines) {
+      const cleaned = line.replace(/^\d+\.\s*/, '').replace(/^[-\*\•]\s*/, '').trim()
+      if (cleaned && cleaned.length > 10 && !cleaned.match(/^(OVERALL|SCORES|SUMMARY)/i)) {
+        items.push(cleaned)
+      }
+    }
+  }
+  
+  // If no items found in structured format, look for numbered or bulleted lists
+  if (items.length === 0) {
+    const lines = text.split('\n')
+    for (const line of lines) {
+      if (line.match(/^[\d\-\*\•]\s*(.+)/)) {
+        const cleaned = line.replace(/^[\d\-\*\•]\s*/, '').trim()
+        if (cleaned && cleaned.length > 10 && !cleaned.match(/^(TR|CC|LR|GRA|OVERALL|SCORES|SUMMARY)/i)) {
+          items.push(cleaned)
+        }
+      }
+    }
+  }
+  
+  // Ensure we have at least some action items
+  if (items.length === 0) {
+    items.push("Continue practicing IELTS writing tasks")
+    items.push("Review grammar and vocabulary resources")
+    items.push("Focus on addressing all parts of the task prompt")
+  }
+  
+  return items.slice(0, 5) // Limit to 5 items
 }
