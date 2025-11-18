@@ -37,7 +37,9 @@ export function useAIQueueStatus(): QueueStatus {
 
     const unsubscribe = queue.subscribe(updateStatus)
     
-    return unsubscribe
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   return status
