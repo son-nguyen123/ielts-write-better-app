@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
     // Filter tasks that have been scored (have overallBand)
     const scoredTasks = allTasks.filter(task => 
       task.overallBand !== undefined && 
-      task.status === "submitted" &&
       task.createdAt
     )
 
