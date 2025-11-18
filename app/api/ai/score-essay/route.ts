@@ -87,14 +87,15 @@ Please provide your IELTS evaluation.`
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
+        error: "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang xử lý nhiều yêu cầu. Vui lòng thử lại sau 1-2 phút hoặc bài viết của bạn sẽ được tự động xử lý khi hệ thống sẵn sàng.",
+        errorType: "RATE_LIMIT",
+        retryAfter: 120 // Suggest retry after 2 minutes
       }, { status: 429 })
     }
     
     // Generic error
     return Response.json({ 
-      error: error instanceof Error ? error.message : "Failed to score essay",
+      error: error instanceof Error ? error.message : "Không thể chấm điểm bài viết. Vui lòng kiểm tra kết nối và thử lại.",
       errorType: "GENERIC"
     }, { status: 500 })
   }

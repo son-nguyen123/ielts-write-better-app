@@ -95,10 +95,11 @@ export async function retryWithBackoff<T>(
 
 /**
  * Retry configuration optimized for Gemini API
+ * Increased retries and delays to better handle rate limits
  */
 export const GEMINI_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 5,
-  initialDelayMs: 1000,
-  maxDelayMs: 32000,
+  maxRetries: 8,
+  initialDelayMs: 2000,
+  maxDelayMs: 60000,
   backoffMultiplier: 2,
 }
