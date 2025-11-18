@@ -131,6 +131,6 @@ function calculatePracticeTime(tasks: TaskDocument[]) {
   return {
     hoursThisWeek: estimateHours(tasksThisWeek),
     hoursThisMonth: estimateHours(tasksThisMonth),
-    tasksCompleted: tasks.filter(task => task.status === "submitted").length
+    tasksCompleted: tasks.filter(task => task.overallBand !== undefined).length
   }
 }
