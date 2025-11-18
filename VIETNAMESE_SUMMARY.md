@@ -1,25 +1,40 @@
-# Giải pháp Quản lý Quota API Gemini - Tóm tắt
+# Giải pháp Quản lý Quota API Gemini - Tóm tắt (CẬP NHẬT)
+
+## ⚠️ CẬP NHẬT QUAN TRỌNG - November 2025
+
+**Vấn đề đã được tối ưu hóa:**
+Hệ thống trước đây có **HAI cơ chế kiểm soát rate limit** gây ra sự nhầm lẫn:
+1. ❌ Client-side queue (đã XÓA) - trong `lib/request-queue.ts`
+2. ✅ Server-side queue (VẪN SỬ DỤNG) - trong `lib/server-rate-limiter.ts`
+
+**Giải pháp mới:**
+- ✅ **Đã xóa client-side queue** - không cần thiết và gây nhầm lẫn
+- ✅ **Chỉ sử dụng server-side rate limiting** - đơn giản và hiệu quả hơn
+- ✅ **Thông báo lỗi rõ ràng hơn** - không còn nói về "quản lý nhiều yêu cầu"
+
+---
 
 ## Vấn đề đã được giải quyết
 
 Ứng dụng gặp lỗi "quota exceeded" khi sử dụng Gemini API, mặc dù bảng điều khiển hiển thị chưa đạt giới hạn RPM/TPM/RPD.
 
-## Nguyên nhân chính
+## Nguyên nhân chính (ĐÃ KHẮC PHỤC)
 
-1. **Không có kiểm soát request ở server-side**: Nhiều request có thể được gửi đồng thời
-2. **Request burst**: Người dùng gửi nhiều request liên tiếp quá nhanh
-3. **Retry quá mạnh**: Hệ thống retry tới 8 lần với delay ngắn, làm tăng áp lực lên API
-4. **Không có queue request**: Mỗi request được xử lý độc lập, không có hàng đợi
+1. ~~**Không có kiểm soát request ở server-side**~~ → ✅ Đã có server-side rate limiter
+2. ~~**Request burst**~~ → ✅ Server queue kiểm soát tốc độ request
+3. ~~**Retry quá mạnh**~~ → ✅ Đã giảm xuống 3 lần retry
+4. ~~**Hai queue trùng lặp**~~ → ✅ Đã xóa client-side queue, chỉ giữ server-side
 
 ## Giải pháp đã triển khai
 
-### 1. Server-Side Rate Limiter (`lib/server-rate-limiter.ts`)
+### 1. Server-Side Rate Limiter (`lib/server-rate-limiter.ts`) - DUY NHẤT
 
 **Tính năng:**
 - ✅ Chỉ cho phép 1 request chạy cùng lúc
 - ✅ Đảm bảo ít nhất 3 giây giữa các request (tối đa ~20 request/phút)
 - ✅ Hàng đợi FIFO (First In First Out)
 - ✅ Global singleton - tất cả API routes dùng chung 1 queue
+- ✅ **KHÔNG CÓ client-side queue nữa** - đã xóa để đơn giản hóa
 
 **Ví dụ:**
 ```
@@ -50,34 +65,88 @@ Các endpoint sau đã được bọc với `withRateLimit()`:
 - `/api/ai/generate-outline` - Tạo dàn ý
 - `/api/ai/generate-prompts` - Tạo đề bài
 
-### 4. Thông báo lỗi tốt hơn
+### 4. Thông báo lỗi rõ ràng hơn (CẬP NHẬT)
 
-**Trước:**
-```
-"API quota exceeded. Try again later."
-```
-
-**Sau:**
+**Trước (gây nhầm lẫn):**
 ```
 "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang quản lý nhiều yêu cầu để tránh vượt quota. Vui lòng thử lại sau 1-2 phút."
 ```
 
-### 5. Logging chi tiết
-
-Thêm log với timestamp và context để debug:
+**Sau (đơn giản hơn):**
 ```
-[score-essay] Error details: { 
-  status: 429, 
-  message: "...", 
-  timestamp: "2025-11-18T06:30:00.000Z" 
-}
+"AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút."
 ```
 
-## Cách sử dụng
+**Lý do:** Người dùng không cần biết chi tiết kỹ thuật về queue. Chỉ cần biết là hệ thống đang bận và nên thử lại.
 
-### Không cần thay đổi code frontend
+## Câu trả lời cho câu hỏi của bạn
 
-Frontend không cần thay đổi gì. Rate limiting hoạt động tự động ở server-side.
+**Câu hỏi:** "TẠI SAO NÓ LẠI NÓI XỬ LÍ NHIỀU YÊU CẦU?"
+
+**Trả lời:** 
+Trước đây, hệ thống có **HAI hàng đợi** (client-side và server-side), nên thông báo lỗi nói về "xử lý nhiều yêu cầu" gây nhầm lẫn. 
+
+**Đã khắc phục:**
+- ✅ Xóa client-side queue (không cần thiết)
+- ✅ Chỉ giữ server-side queue (đủ dùng)
+- ✅ Đơn giản hóa thông báo lỗi
+- ✅ Bây giờ chỉ có MỘT hàng đợi duy nhất ở server
+
+**Các yêu cầu mà hệ thống xử lý:**
+Chỉ có **MỘT yêu cầu** - chấm điểm bài viết của bạn. Không có yêu cầu nào khác được gửi đi khi bạn submit bài.
+
+## Cách hoạt động (CẬP NHẬT)
+
+### Request Flow (Mới)
+
+```
+Người dùng → Submit bài viết
+    ↓
+Component → Gọi API trực tiếp (không qua client queue)
+    ↓
+API Route → Server Rate Limiter
+    ↓
+Gemini API → Chấm điểm
+    ↓
+Kết quả trả về
+```
+
+### Request Flow (Cũ - ĐÃ XÓA)
+
+```
+Người dùng → Submit bài viết
+    ↓
+Component → Client Queue (2s) ❌ ĐÃ XÓA
+    ↓
+API Route → Server Queue (3s) ✅ VẪN CÒN
+    ↓
+Gemini API → Chấm điểm
+```
+
+## Cách sử dụng (CẬP NHẬT)
+
+### Code đã đơn giản hóa
+
+**Trước (phức tạp):**
+```typescript
+import { queueAIRequest } from "@/lib/request-queue"
+
+const data = await queueAIRequest(async () => {
+  const response = await fetch("/api/ai/score-essay", {...})
+  return response.json()
+})
+```
+
+**Sau (đơn giản):**
+```typescript
+const response = await fetch("/api/ai/score-essay", {...})
+const data = await response.json()
+```
+
+**Không còn:** 
+- ❌ Client-side queue
+- ❌ AIQueueIndicator component
+- ❌ useAIQueueStatus hook
 
 ### Kiểm tra logs
 
