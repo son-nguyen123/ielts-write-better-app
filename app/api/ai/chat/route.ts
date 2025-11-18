@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 30
 
@@ -63,9 +64,12 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
 
     const lastMessage = geminiMessages[geminiMessages.length - 1]
-    const result = await retryWithBackoff(
-      () => chat.sendMessageStream(lastMessage.parts[0].text),
-      GEMINI_RETRY_CONFIG
+    // Use server-side rate limiting to prevent quota exhaustion
+    const result = await withRateLimit(() =>
+      retryWithBackoff(
+        () => chat.sendMessageStream(lastMessage.parts[0].text),
+        GEMINI_RETRY_CONFIG
+      )
     )
 
     const encoder = new TextEncoder()
@@ -93,6 +97,11 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
+    console.error("[/api/ai/chat] Error details:", {
+      status: err?.status,
+      message: err?.message,
+      timestamp: new Date().toISOString(),
+    })
     
     // Check for rate limit / quota errors
     const errorMessage = err?.message || err?.toString() || ""
@@ -106,7 +115,7 @@ Essay: ${attachedTask?.essay ?? ""}`
     
     if (isRateLimitError) {
       return NextResponse.json({ 
-        error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
+        error: "AI chat đang vượt giới hạn sử dụng. Hệ thống đang quản lý yêu cầu để tránh vượt quota. Vui lòng thử lại sau vài phút.",
         errorType: "RATE_LIMIT"
       }, { status: 429 })
     }

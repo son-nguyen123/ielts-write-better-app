@@ -1,5 +1,6 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 60
 
@@ -41,21 +42,24 @@ ${essay}
 
 Please provide your IELTS evaluation.`
 
-    const result = await retryWithBackoff(
-      () =>
-        model.generateContent({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+    // Use server-side rate limiting to prevent quota exhaustion
+    const result = await withRateLimit(() =>
+      retryWithBackoff(
+        () =>
+          model.generateContent({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1500,
             },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1500,
-          },
-        }),
-      GEMINI_RETRY_CONFIG
+          }),
+        GEMINI_RETRY_CONFIG
+      )
     )
 
     const response = result.response
@@ -75,6 +79,13 @@ Please provide your IELTS evaluation.`
   } catch (error: any) {
     console.error("[score-essay] Error:", error)
     
+    // Log additional context for debugging
+    console.error("[score-essay] Error details:", {
+      status: error?.status,
+      message: error?.message,
+      timestamp: new Date().toISOString(),
+    })
+    
     // Check for rate limit / quota errors
     const errorMessage = error?.message || error?.toString() || ""
     const isRateLimitError = 
@@ -87,7 +98,7 @@ Please provide your IELTS evaluation.`
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang xử lý nhiều yêu cầu. Vui lòng thử lại sau 1-2 phút hoặc bài viết của bạn sẽ được tự động xử lý khi hệ thống sẵn sàng.",
+        error: "AI chấm điểm đang vượt giới hạn sử dụng. Hệ thống đang quản lý nhiều yêu cầu để tránh vượt quota. Vui lòng thử lại sau 1-2 phút.",
         errorType: "RATE_LIMIT",
         retryAfter: 120 // Suggest retry after 2 minutes
       }, { status: 429 })
