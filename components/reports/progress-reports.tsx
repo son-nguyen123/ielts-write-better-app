@@ -1,45 +1,123 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react"
+import { TrendingUp, TrendingDown, AlertCircle, Loader2 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { RadarChart } from "@/components/dashboard/radar-chart"
+import { useAuth } from "@/lib/firebase-auth"
+import type { ProgressReportData } from "@/types/reports"
 
-const overallTrendData = [
-  { date: "Week 1", score: 6.0 },
-  { date: "Week 2", score: 6.5 },
-  { date: "Week 3", score: 6.5 },
-  { date: "Week 4", score: 7.0 },
-  { date: "Week 5", score: 6.5 },
-  { date: "Week 6", score: 7.0 },
-  { date: "Week 7", score: 7.0 },
-  { date: "Week 8", score: 7.5 },
-]
+interface ProgressReportsProps {
+  userId?: string
+}
 
-const criteriaData = [
-  { date: "Week 1", TR: 6.0, CC: 6.5, LR: 5.5, GRA: 6.0 },
-  { date: "Week 2", TR: 6.5, CC: 7.0, LR: 6.0, GRA: 6.5 },
-  { date: "Week 3", TR: 6.5, CC: 7.0, LR: 6.0, GRA: 6.5 },
-  { date: "Week 4", TR: 7.0, CC: 7.5, LR: 6.5, GRA: 7.0 },
-  { date: "Week 5", TR: 6.5, CC: 7.0, LR: 6.5, GRA: 6.5 },
-  { date: "Week 6", TR: 7.0, CC: 7.5, LR: 6.5, GRA: 7.0 },
-  { date: "Week 7", TR: 7.0, CC: 7.5, LR: 6.5, GRA: 7.0 },
-  { date: "Week 8", TR: 7.5, CC: 8.0, LR: 7.0, GRA: 7.5 },
-]
+export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {}) {
+  const { user } = useAuth()
+  const [dateRange, setDateRange] = useState<"7" | "30" | "90">("30")
+  const [reportData, setReportData] = useState<ProgressReportData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-const commonIssues = [
-  { issue: "Limited vocabulary range", count: 12, trend: "down" },
-  { issue: "Comma splices", count: 8, trend: "down" },
-  { issue: "Weak topic sentences", count: 6, trend: "stable" },
-  { issue: "Insufficient examples", count: 5, trend: "down" },
-  { issue: "Repetitive linking words", count: 4, trend: "down" },
-]
+  const userId = propUserId || user?.uid
 
-export function ProgressReports() {
-  const [dateRange, setDateRange] = useState("30")
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+
+    fetchReportData()
+  }, [userId, dateRange])
+
+  async function fetchReportData() {
+    if (!userId) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/reports/progress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          dateRange: parseInt(dateRange),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch report data")
+      }
+
+      const data = await response.json()
+      setReportData(data)
+    } catch (err) {
+      console.error("Error fetching report:", err)
+      setError(err instanceof Error ? err.message : "Failed to load report")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!userId) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Please sign in to view your progress reports.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-destructive">{error}</p>
+        <button
+          onClick={fetchReportData}
+          className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+        >
+          Try Again
+        </button>
+      </div>
+    )
+  }
+
+  if (!reportData) {
+    return null
+  }
+
+  // Prepare data for charts
+  const overallTrendData = reportData.overallScoreTrend.map(item => ({
+    date: `Week ${item.week}`,
+    score: item.score
+  }))
+
+  const criteriaData = reportData.overallScoreTrend.map((item, index) => {
+    const week = item.week
+    return {
+      date: `Week ${week}`,
+      TR: reportData.criteriaTrends.TR.find(d => d.week === week)?.score || 0,
+      CC: reportData.criteriaTrends.CC.find(d => d.week === week)?.score || 0,
+      LR: reportData.criteriaTrends.LR.find(d => d.week === week)?.score || 0,
+      GRA: reportData.criteriaTrends.GRA.find(d => d.week === week)?.score || 0,
+    }
+  })
+
+  const trendValue = reportData.overallScoreTrendValue
+  const isPositive = trendValue.startsWith("+")
+  const isNegative = trendValue.startsWith("-")
 
   return (
     <div>
@@ -48,157 +126,281 @@ export function ProgressReports() {
         <p className="text-muted-foreground">Track your improvement over time</p>
       </div>
 
-      {/* Overall Trend */}
-      <Card className="rounded-2xl border-border bg-card mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Overall Score Trend</CardTitle>
-              <CardDescription>Your average band score over time</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-success" />
-              <span className="text-2xl font-bold text-success">+1.5</span>
-              <span className="text-sm text-muted-foreground">since start</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={overallTrendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <YAxis
-                domain={[5, 9]}
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                label={{ value: "Band Score", angle: -90, position: "insideLeft" }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-              <Line type="monotone" dataKey="score" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <div className="grid lg:grid-cols-2 gap-6 mb-6">
-        {/* Criteria Radar */}
+      {reportData.overallScoreTrend.length === 0 ? (
         <Card className="rounded-2xl border-border bg-card">
-          <CardHeader>
-            <CardTitle>Criteria Breakdown</CardTitle>
-            <CardDescription>Current performance across all criteria</CardDescription>
-            <Tabs value={dateRange} onValueChange={setDateRange} className="mt-4">
-              <TabsList>
-                <TabsTrigger value="7">7 days</TabsTrigger>
-                <TabsTrigger value="30">30 days</TabsTrigger>
-                <TabsTrigger value="90">90 days</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardContent>
-            <RadarChart />
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground mb-4">
+              {reportData.personalizedFeedback.overallSummary}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Submit and score some essays to see your progress!
+            </p>
           </CardContent>
         </Card>
+      ) : (
+        <>
+          {/* Overall Trend */}
+          <Card className="rounded-2xl border-border bg-card mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Overall Score Trend</CardTitle>
+                  <CardDescription>Your average band score over time</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isPositive ? (
+                    <TrendingUp className="h-5 w-5 text-success" />
+                  ) : isNegative ? (
+                    <TrendingDown className="h-5 w-5 text-destructive" />
+                  ) : (
+                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <span className={`text-2xl font-bold ${isPositive ? "text-success" : isNegative ? "text-destructive" : "text-muted-foreground"}`}>
+                    {trendValue.split(" ")[0]}
+                  </span>
+                  <span className="text-sm text-muted-foreground">since start</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={overallTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis
+                    domain={[5, 9]}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                    label={{ value: "Band Score", angle: -90, position: "insideLeft" }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Line type="monotone" dataKey="score" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        {/* Common Issues */}
-        <Card className="rounded-2xl border-border bg-card">
-          <CardHeader>
-            <CardTitle>Common Issues</CardTitle>
-            <CardDescription>Top 5 recurring problems in your writing</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {commonIssues.map((item, index) => (
-                <div key={index} className="flex items-center gap-3 pb-4 border-b border-border last:border-0">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertCircle className="h-4 w-4 text-warning" />
-                      <p className="text-sm font-medium">{item.issue}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Occurred {item.count} times</p>
+          <div className="grid lg:grid-cols-2 gap-6 mb-6">
+            {/* Criteria Radar */}
+            <Card className="rounded-2xl border-border bg-card">
+              <CardHeader>
+                <CardTitle>Criteria Breakdown</CardTitle>
+                <CardDescription>Current performance across all criteria</CardDescription>
+                <Tabs value={dateRange} onValueChange={(value) => setDateRange(value as "7" | "30" | "90")} className="mt-4">
+                  <TabsList>
+                    <TabsTrigger value="7">7 days</TabsTrigger>
+                    <TabsTrigger value="30">30 days</TabsTrigger>
+                    <TabsTrigger value="90">90 days</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardHeader>
+              <CardContent>
+                <RadarChart 
+                  scores={{
+                    TR: reportData.criteriaBreakdown.TR,
+                    CC: reportData.criteriaBreakdown.CC,
+                    LR: reportData.criteriaBreakdown.LR,
+                    GRA: reportData.criteriaBreakdown.GRA
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Common Issues */}
+            <Card className="rounded-2xl border-border bg-card">
+              <CardHeader>
+                <CardTitle>Common Issues</CardTitle>
+                <CardDescription>Top recurring problems in your writing</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {reportData.commonIssues.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No issues identified yet. Keep writing to get more insights!
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {reportData.commonIssues.map((item, index) => (
+                      <div key={index} className="flex items-center gap-3 pb-4 border-b border-border last:border-0">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <AlertCircle className="h-4 w-4 text-warning" />
+                            <p className="text-sm font-medium">{item.name}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Occurred {item.count} times</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {item.trend === "Improving" ? (
+                            <>
+                              <TrendingDown className="h-4 w-4 text-success" />
+                              <Badge variant="success" className="text-xs">
+                                Improving
+                              </Badge>
+                            </>
+                          ) : item.trend === "Worsening" ? (
+                            <>
+                              <TrendingUp className="h-4 w-4 text-destructive" />
+                              <Badge variant="destructive" className="text-xs">
+                                Worsening
+                              </Badge>
+                            </>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              Stable
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1">
-                    {item.trend === "down" ? (
-                      <>
-                        <TrendingDown className="h-4 w-4 text-success" />
-                        <Badge variant="success" className="text-xs">
-                          Improving
-                        </Badge>
-                      </>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">
-                        Stable
-                      </Badge>
-                    )}
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Detailed Criteria Trends */}
+          {criteriaData.length > 0 && (
+            <Card className="rounded-2xl border-border bg-card mb-6">
+              <CardHeader>
+                <CardTitle>Criteria Trends</CardTitle>
+                <CardDescription>Track individual criteria performance over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={criteriaData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                    <YAxis
+                      domain={[5, 9]}
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      label={{ value: "Band Score", angle: -90, position: "insideLeft" }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="TR" stroke="hsl(var(--chart-1))" strokeWidth={2} />
+                    <Line type="monotone" dataKey="CC" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                    <Line type="monotone" dataKey="LR" stroke="hsl(var(--chart-3))" strokeWidth={2} />
+                    <Line type="monotone" dataKey="GRA" stroke="hsl(var(--chart-4))" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Practice Time */}
+          <Card className="rounded-2xl border-border bg-card mb-6">
+            <CardHeader>
+              <CardTitle>Practice Time</CardTitle>
+              <CardDescription>Your writing activity this period</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid sm:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-primary mb-2">
+                    {reportData.practiceTime.hoursThisWeek}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Hours this week</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-accent mb-2">
+                    {reportData.practiceTime.hoursThisMonth}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Hours this month</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-chart-3 mb-2">
+                    {reportData.practiceTime.tasksCompleted}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Tasks completed</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Personalized Feedback */}
+          <Card className="rounded-2xl border-border bg-card">
+            <CardHeader>
+              <CardTitle>Personalized Feedback</CardTitle>
+              <CardDescription>AI-generated insights and recommendations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Overall Summary */}
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Overall Progress</h3>
+                <p className="text-sm text-muted-foreground">
+                  {reportData.personalizedFeedback.overallSummary}
+                </p>
+              </div>
+
+              {/* Strengths */}
+              {reportData.personalizedFeedback.strengths.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-success" />
+                    Strengths
+                  </h3>
+                  <ul className="space-y-1">
+                    {reportData.personalizedFeedback.strengths.map((strength, index) => (
+                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-success">•</span>
+                        <span>{strength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Weaknesses */}
+              {reportData.personalizedFeedback.weaknesses.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    Areas for Improvement
+                  </h3>
+                  <ul className="space-y-1">
+                    {reportData.personalizedFeedback.weaknesses.map((weakness, index) => (
+                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-warning">•</span>
+                        <span>{weakness}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {reportData.personalizedFeedback.recommendations.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Recommendations</h3>
+                  <div className="space-y-3">
+                    {reportData.personalizedFeedback.recommendations.map((rec, index) => (
+                      <div key={index} className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-sm font-medium">{rec.title}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {rec.relatedCriterion}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{rec.description}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Criteria Trends */}
-      <Card className="rounded-2xl border-border bg-card">
-        <CardHeader>
-          <CardTitle>Criteria Trends</CardTitle>
-          <CardDescription>Track individual criteria performance over time</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={criteriaData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <YAxis
-                domain={[5, 9]}
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                label={{ value: "Band Score", angle: -90, position: "insideLeft" }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-              <Legend />
-              <Line type="monotone" dataKey="TR" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-              <Line type="monotone" dataKey="CC" stroke="hsl(var(--chart-2))" strokeWidth={2} />
-              <Line type="monotone" dataKey="LR" stroke="hsl(var(--chart-3))" strokeWidth={2} />
-              <Line type="monotone" dataKey="GRA" stroke="hsl(var(--chart-4))" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Practice Time */}
-      <Card className="rounded-2xl border-border bg-card mt-6">
-        <CardHeader>
-          <CardTitle>Practice Time</CardTitle>
-          <CardDescription>Your writing activity this period</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid sm:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">8.5</div>
-              <p className="text-sm text-muted-foreground">Hours this week</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-accent mb-2">32</div>
-              <p className="text-sm text-muted-foreground">Hours this month</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-chart-3 mb-2">15</div>
-              <p className="text-sm text-muted-foreground">Tasks completed</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }
