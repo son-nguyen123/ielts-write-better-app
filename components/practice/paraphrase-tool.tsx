@@ -7,8 +7,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Sparkles, Copy, Check } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { queueAIRequest } from "@/lib/request-queue"
-import { AIQueueIndicator } from "@/components/ui/ai-queue-indicator"
 
 export function ParaphraseTool() {
   const { toast } = useToast()
@@ -20,31 +18,27 @@ export function ParaphraseTool() {
   const handleGenerate = async () => {
     setIsGenerating(true)
     try {
-      const data = await queueAIRequest(async () => {
-        const response = await fetch("/api/ai/paraphrase", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: input }),
-        })
-
-        const result = await response.json()
-        
-        if (!response.ok) {
-          // Check for rate limit errors
-          if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
-            const error: any = new Error(result?.error || "AI diễn giải đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
-            error.title = "Vượt giới hạn sử dụng"
-            throw error
-          } else {
-            throw new Error(result?.error || "Failed to generate paraphrases. Please try again.")
-          }
-        }
-        
-        return result
+      const response = await fetch("/api/ai/paraphrase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: input }),
       })
+
+      const result = await response.json()
       
-      if (data.paraphrases) {
-        setParaphrases(data.paraphrases)
+      if (!response.ok) {
+        // Check for rate limit errors
+        if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+          const error: any = new Error(result?.error || "AI diễn giải đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
+          error.title = "Vượt giới hạn sử dụng"
+          throw error
+        } else {
+          throw new Error(result?.error || "Failed to generate paraphrases. Please try again.")
+        }
+      }
+      
+      if (result.paraphrases) {
+        setParaphrases(result.paraphrases)
       }
     } catch (error: any) {
       console.error("[v0] Error generating paraphrases:", error)
@@ -111,9 +105,6 @@ export function ParaphraseTool() {
                 </>
               )}
             </Button>
-
-            {/* Queue Status Indicator */}
-            <AIQueueIndicator />
           </CardContent>
         </Card>
 
