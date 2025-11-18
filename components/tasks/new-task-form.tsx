@@ -132,14 +132,16 @@ export function NewTaskForm() {
         return
       }
 
-      // Call the scoring API directly - server-side rate limiting handles queue management
-      const scoringResponse = await fetch("/api/ai/score-essay", {
+      // Call the new essay evaluation API
+      const scoringResponse = await fetch("/api/essays/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          essay: response,
+          essayText: response,
           taskType,
-          prompt: resolvedPrompt,
+          promptText: resolvedPrompt,
+          userId: user.uid,
+          promptId: selectedPrompt || null,
         }),
       })
 
@@ -177,6 +179,7 @@ export function NewTaskForm() {
         summary: feedback.summary,
         feedback,
         actionItems: feedback.actionItems,
+        revisionId: scoringData.revisionId,
       })
 
       toast({
