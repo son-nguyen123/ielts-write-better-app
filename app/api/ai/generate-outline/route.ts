@@ -1,6 +1,7 @@
 import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { withRateLimit } from "@/lib/server-rate-limiter"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -37,12 +38,14 @@ export async function POST(req: Request) {
       return Response.json({ error: "Topic is required" }, { status: 400 })
     }
 
-    const { object } = await retryWithBackoff(
-      () =>
-        generateObject({
-          model: getGoogleModel(),
-          schema: outlineSchema,
-          prompt: `Create a detailed essay outline for an IELTS Task 2 essay targeting band ${targetBand || "7.0"}.
+    // Use server-side rate limiting to prevent quota exhaustion
+    const { object } = await withRateLimit(() =>
+      retryWithBackoff(
+        () =>
+          generateObject({
+            model: getGoogleModel(),
+            schema: outlineSchema,
+            prompt: `Create a detailed essay outline for an IELTS Task 2 essay targeting band ${targetBand || "7.0"}.
 
 Topic: "${topic}"
 
@@ -54,9 +57,10 @@ Generate a complete outline with:
 5. Conclusion (summary + final thought)
 
 Make it specific to the topic and appropriate for the target band score.`,
-          temperature: 0.7,
-        }),
-      GEMINI_RETRY_CONFIG
+            temperature: 0.7,
+          }),
+        GEMINI_RETRY_CONFIG
+      )
     )
 
     return Response.json({ outline: object })
