@@ -15,6 +15,7 @@ import { TargetSetting } from "./target-setting"
 import { SkillPriorityVisualization } from "./skill-priority-visualization"
 import { TargetRecommendations } from "./target-recommendations"
 import { RecentSubmissionsTable } from "./recent-submissions-table"
+import { PerformanceComparisonChart } from "./performance-comparison-chart"
 import type { ProgressReportData, UserTarget, CommonIssue } from "@/types/reports"
 
 // Criteria full names for better clarity
@@ -511,6 +512,26 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          )}
+
+          {/* Performance Comparison Chart */}
+          {reportData.criteriaBreakdown && (
+            <div className="mb-6" id="performance-comparison" data-toc-title="Before & After Comparison">
+              <PerformanceComparisonChart
+                beforeScores={{
+                  TR: 5.5,
+                  CC: 5.0,
+                  LR: 5.0,
+                  GRA: 4.5
+                }}
+                currentScores={{
+                  TR: reportData.criteriaBreakdown.TR,
+                  CC: reportData.criteriaBreakdown.CC,
+                  LR: reportData.criteriaBreakdown.LR,
+                  GRA: reportData.criteriaBreakdown.GRA
+                }}
+              />
+            </div>
           )}
 
           {/* Recent Performance */}
