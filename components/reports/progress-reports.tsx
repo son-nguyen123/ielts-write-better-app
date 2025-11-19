@@ -191,12 +191,12 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Progress Reports</h1>
+        <h1 className="text-3xl font-bold mb-2" id="progress-reports" data-toc-title="Progress Reports">Progress Reports</h1>
         <p className="text-muted-foreground">Track your improvement over time and reach your targets</p>
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center">
+      <div className="mb-6 flex flex-wrap gap-4 items-center" id="filters" data-toc-title="Filters">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">Filters:</span>
@@ -235,7 +235,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
       ) : (
         <>
           {/* Overview Cards */}
-          <div className="mb-6">
+          <div className="mb-6" id="overview-cards" data-toc-title="Overview">
             <OverviewCards
               currentAverage={reportData.currentOverallAverage}
               bestRecentScore={reportData.bestRecentScore}
@@ -250,7 +250,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
 
           {/* Target Setting and Skill Priority */}
           {userId && (
-            <div className="grid lg:grid-cols-3 gap-6 mb-6">
+            <div className="grid lg:grid-cols-3 gap-6 mb-6" id="target-skill-priority" data-toc-title="Target & Skills">
               <div className="lg:col-span-1">
                 <TargetSetting
                   userId={userId}
@@ -271,7 +271,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             </div>
           )}
           {/* Overall Trend */}
-          <Card className="rounded-2xl border-border bg-card mb-6">
+          <Card className="rounded-2xl border-border bg-card mb-6" id="overall-trend" data-toc-title="Overall Trend">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -328,7 +328,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
 
           <div className="grid lg:grid-cols-2 gap-6 mb-6">
             {/* Criteria Radar */}
-            <Card className="rounded-2xl border-border bg-card">
+            <Card className="rounded-2xl border-border bg-card" id="criteria-breakdown" data-toc-title="Criteria Breakdown">
               <CardHeader>
                 <CardTitle className="text-xl">Criteria Breakdown</CardTitle>
                 <CardDescription className="text-base">Current performance across all criteria</CardDescription>
@@ -371,7 +371,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             </Card>
 
             {/* Common Issues */}
-            <Card className="rounded-2xl border-border bg-card">
+            <Card className="rounded-2xl border-border bg-card" id="common-issues" data-toc-title="Common Issues">
               <CardHeader>
                 <CardTitle className="text-xl">Common Issues</CardTitle>
                 <CardDescription className="text-base">Top recurring problems in your writing</CardDescription>
@@ -423,7 +423,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
 
           {/* Task Type Performance Bar Chart */}
           {taskTypeChartData.length > 0 && (
-            <Card className="rounded-2xl border-border bg-card mb-6">
+            <Card className="rounded-2xl border-border bg-card mb-6" id="task-type-performance" data-toc-title="Performance by Task Type">
               <CardHeader>
                 <CardTitle className="text-2xl">Performance by Task Type</CardTitle>
                 <CardDescription className="text-base">Average scores across different task types</CardDescription>
@@ -459,7 +459,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
 
           {/* Detailed Criteria Trends */}
           {criteriaData.length > 0 && (
-            <Card className="rounded-2xl border-border bg-card mb-6">
+            <Card className="rounded-2xl border-border bg-card mb-6" id="criteria-trends" data-toc-title="Criteria Trends">
               <CardHeader>
                 <CardTitle className="text-2xl">Criteria Trends</CardTitle>
                 <CardDescription className="text-base">Track individual criteria performance over time</CardDescription>
@@ -525,7 +525,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           )}
 
           {/* Practice Time */}
-          <Card className="rounded-2xl border-border bg-card mb-6">
+          <Card className="rounded-2xl border-border bg-card mb-6" id="practice-time" data-toc-title="Practice Time">
             <CardHeader>
               <CardTitle className="text-2xl">Practice Time</CardTitle>
               <CardDescription className="text-base">Your writing activity this period</CardDescription>
@@ -555,7 +555,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           </Card>
 
           {/* Personalized Feedback */}
-          <Card className="rounded-2xl border-border bg-card">
+          <Card className="rounded-2xl border-border bg-card" id="personalized-feedback" data-toc-title="Personalized Feedback">
             <CardHeader>
               <CardTitle>Personalized Feedback</CardTitle>
               <CardDescription>AI-generated insights and recommendations</CardDescription>

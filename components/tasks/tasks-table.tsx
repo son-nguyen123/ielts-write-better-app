@@ -116,7 +116,7 @@ export function TasksTable() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Your Tasks</h1>
+        <h1 className="text-3xl font-bold" id="your-tasks" data-toc-title="Your Tasks">Your Tasks</h1>
         <Link href="/tasks/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
@@ -125,7 +125,7 @@ export function TasksTable() {
         </Link>
       </div>
 
-      <Card className="rounded-2xl border-border bg-card">
+      <Card className="rounded-2xl border-border bg-card" id="tasks-list" data-toc-title="Tasks List">
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
