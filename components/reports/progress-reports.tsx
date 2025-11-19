@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Select } from "@/components/ui/select"
 import { TrendingUp, TrendingDown, AlertCircle, Loader2, Filter } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { RadarChart } from "@/components/dashboard/radar-chart"
 import { useAuth } from "@/lib/firebase-auth"
 import { OverviewCards } from "./overview-cards"
@@ -182,12 +182,6 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
   const isPositive = trendValue.startsWith("+")
   const isNegative = trendValue.startsWith("-")
 
-  // Prepare data for task type bar chart
-  const taskTypeChartData = reportData.taskTypeStats.map(stat => ({
-    taskType: stat.taskType,
-    average: stat.averageOverall
-  }))
-
   return (
     <div>
       <div className="mb-6">
@@ -348,25 +342,8 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                     LR: reportData.criteriaBreakdown.LR,
                     GRA: reportData.criteriaBreakdown.GRA
                   }}
+                  target={userTarget?.targetOverallBand}
                 />
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-chart-1"></div>
-                    <span className="text-xs text-muted-foreground">TR - Task Response</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-chart-2"></div>
-                    <span className="text-xs text-muted-foreground">CC - Coherence & Cohesion</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-chart-3"></div>
-                    <span className="text-xs text-muted-foreground">LR - Lexical Resource</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-chart-4"></div>
-                    <span className="text-xs text-muted-foreground">GRA - Grammar & Accuracy</span>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
@@ -421,41 +398,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             </Card>
           </div>
 
-          {/* Task Type Performance Bar Chart */}
-          {taskTypeChartData.length > 0 && (
-            <Card className="rounded-2xl border-border bg-card mb-6" id="task-type-performance" data-toc-title="Performance by Task Type">
-              <CardHeader>
-                <CardTitle className="text-2xl">Performance by Task Type</CardTitle>
-                <CardDescription className="text-base">Average scores across different task types</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={taskTypeChartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-                    <XAxis 
-                      dataKey="taskType" 
-                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
-                      tickLine={{ stroke: "hsl(var(--border))" }}
-                    />
-                    <YAxis
-                      domain={[0, 9]}
-                      ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
-                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
-                      tickLine={{ stroke: "hsl(var(--border))" }}
-                      label={{ value: "Band Score", angle: -90, position: "insideLeft", style: { fill: "hsl(var(--foreground))", fontSize: 14 } }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar 
-                      dataKey="average" 
-                      fill="hsl(var(--primary))" 
-                      radius={[8, 8, 0, 0]}
-                      name="Average Score"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
+
 
           {/* Detailed Criteria Trends */}
           {criteriaData.length > 0 && (
@@ -524,10 +467,10 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             </Card>
           )}
 
-          {/* Practice Time */}
-          <Card className="rounded-2xl border-border bg-card mb-6" id="practice-time" data-toc-title="Practice Time">
+          {/* Recent Performance */}
+          <Card className="rounded-2xl border-border bg-card mb-6" id="recent-performance" data-toc-title="Recent Performance">
             <CardHeader>
-              <CardTitle className="text-2xl">Practice Time</CardTitle>
+              <CardTitle className="text-2xl">Recent Performance</CardTitle>
               <CardDescription className="text-base">Your writing activity this period</CardDescription>
             </CardHeader>
             <CardContent>
