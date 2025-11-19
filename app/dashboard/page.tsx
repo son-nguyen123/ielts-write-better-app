@@ -238,6 +238,22 @@ export default function DashboardPage() {
   const recentActivity = useMemo(() => tasks.slice(0, 3), [tasks])
 
   const radarScores = useMemo(() => {
+    // Use aggregated data from reportData if available (shows average across all tasks)
+    if (reportData && reportData.criteriaBreakdown) {
+      const breakdown = reportData.criteriaBreakdown
+      const hasData = CRITERIA_ORDER.some(key => breakdown[key] > 0)
+      
+      if (hasData) {
+        return CRITERIA_ORDER.reduce<Partial<Record<CriterionKey, number>>>((acc, key) => {
+          if (breakdown[key] > 0) {
+            acc[key] = breakdown[key]
+          }
+          return acc
+        }, {})
+      }
+    }
+    
+    // Fallback to latest task if reportData is not available
     const criteria = latestScoredTask?.feedback?.criteria
     if (!criteria) {
       return undefined
@@ -250,7 +266,7 @@ export default function DashboardPage() {
       }
       return acc
     }, {})
-  }, [latestScoredTask])
+  }, [reportData, latestScoredTask])
 
   const bandDelta = useMemo(() => {
     if (latestOverallBand == null || previousBand == null) {
@@ -526,10 +542,10 @@ export default function DashboardPage() {
             <Card className="rounded-2xl border-border bg-card">
               <CardHeader>
                 <CardTitle>Your Progress</CardTitle>
-                <CardDescription>Performance across IELTS criteria</CardDescription>
+                <CardDescription>Average performance across IELTS criteria from all your submissions</CardDescription>
               </CardHeader>
               <CardContent>
-                <RadarChart scores={radarScores} isLoading={isLoading} />
+                <RadarChart scores={radarScores} isLoading={isLoading || reportLoading} />
                 <Link href="/reports">
                   <Button variant="outline" className="w-full mt-4 bg-transparent">
                     <TrendingUp className="mr-2 h-4 w-4" />
