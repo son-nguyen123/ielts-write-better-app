@@ -184,9 +184,10 @@ export function extractCommonIssues(
   const halfRange = Math.floor(dateRange / 2)
   const recentTasks = filterTasksByDateRange(tasks, halfRange as 7 | 30 | 90)
   
-  // Count all issues
+  // Count all issues and track their criterion
   const issueCount = new Map<string, number>()
   const recentIssueCount = new Map<string, number>()
+  const issueCriterion = new Map<string, CriterionKey>()
   
   allTasks.forEach(task => {
     if (!task.feedback) return
@@ -195,6 +196,10 @@ export function extractCommonIssues(
       const issues = task.feedback?.criteria?.[criterion]?.issues || []
       issues.forEach(issue => {
         issueCount.set(issue, (issueCount.get(issue) || 0) + 1)
+        // Store the criterion for this issue (first occurrence)
+        if (!issueCriterion.has(issue)) {
+          issueCriterion.set(issue, criterion)
+        }
       })
     })
   })
@@ -228,7 +233,12 @@ export function extractCommonIssues(
       trend = "Worsening"
     }
     
-    commonIssues.push({ name: issue, count, trend })
+    commonIssues.push({ 
+      name: issue, 
+      count, 
+      trend,
+      relatedCriterion: issueCriterion.get(issue)
+    })
   })
   
   return commonIssues.sort((a, b) => b.count - a.count).slice(0, 5)

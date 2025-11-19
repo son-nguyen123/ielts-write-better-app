@@ -14,6 +14,7 @@ export interface CommonIssue {
   name: string
   count: number
   trend: "Improving" | "Worsening" | "Stable"
+  relatedCriterion?: "TR" | "CC" | "LR" | "GRA"
 }
 
 export interface CriteriaBreakdown {

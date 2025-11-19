@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Select } from "@/components/ui/select"
-import { TrendingUp, TrendingDown, AlertCircle, Loader2, Filter } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { TrendingUp, TrendingDown, AlertCircle, Loader2, Filter, ChevronRight } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { RadarChart } from "@/components/dashboard/radar-chart"
 import { useAuth } from "@/lib/firebase-auth"
@@ -14,7 +15,7 @@ import { TargetSetting } from "./target-setting"
 import { SkillPriorityVisualization } from "./skill-priority-visualization"
 import { TargetRecommendations } from "./target-recommendations"
 import { RecentSubmissionsTable } from "./recent-submissions-table"
-import type { ProgressReportData, UserTarget } from "@/types/reports"
+import type { ProgressReportData, UserTarget, CommonIssue } from "@/types/reports"
 
 // Criteria full names for better clarity
 const CRITERIA_NAMES = {
@@ -36,6 +37,9 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
   const [userTarget, setUserTarget] = useState<UserTarget | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedIssue, setSelectedIssue] = useState<CommonIssue | null>(null)
+  const [improvementSuggestions, setImprovementSuggestions] = useState<string | null>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
   const userId = propUserId || user?.uid
 
@@ -98,6 +102,38 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
       setError(err instanceof Error ? err.message : "Failed to load report")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleIssueClick(issue: CommonIssue) {
+    setSelectedIssue(issue)
+    setLoadingSuggestions(true)
+    setImprovementSuggestions(null)
+
+    try {
+      const response = await fetch("/api/reports/improvement-suggestions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          issueName: issue.name,
+          relatedCriterion: issue.relatedCriterion,
+          userLevel: reportData?.currentOverallAverage
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch improvement suggestions")
+      }
+
+      const data = await response.json()
+      setImprovementSuggestions(data.suggestions)
+    } catch (err) {
+      console.error("Error fetching suggestions:", err)
+      setImprovementSuggestions("Failed to load improvement suggestions. Please try again.")
+    } finally {
+      setLoadingSuggestions(false)
     }
   }
 
@@ -351,7 +387,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             <Card className="rounded-2xl border-border bg-card" id="common-issues" data-toc-title="Common Issues">
               <CardHeader>
                 <CardTitle className="text-xl">Common Issues</CardTitle>
-                <CardDescription className="text-base">Top recurring problems in your writing</CardDescription>
+                <CardDescription className="text-base">Top recurring problems in your writing (click for improvement tips)</CardDescription>
               </CardHeader>
               <CardContent>
                 {reportData.commonIssues.length === 0 ? (
@@ -361,11 +397,20 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                 ) : (
                   <div className="space-y-3">
                     {reportData.commonIssues.map((item, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <button
+                        key={index}
+                        onClick={() => handleIssueClick(item)}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all cursor-pointer text-left group"
+                      >
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <AlertCircle className="h-4 w-4 text-warning" />
                             <p className="text-sm font-medium">{item.name}</p>
+                            {item.relatedCriterion && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.relatedCriterion}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground">Occurred {item.count} times</p>
                         </div>
@@ -389,8 +434,9 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
                               Stable
                             </Badge>
                           )}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -588,6 +634,40 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           )}
         </>
       )}
+
+      {/* Improvement Suggestions Dialog */}
+      <Dialog open={selectedIssue !== null} onOpenChange={(open) => !open && setSelectedIssue(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-warning" />
+              How to Improve: {selectedIssue?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedIssue?.relatedCriterion && (
+                <span>Related to: <strong>{CRITERIA_NAMES[selectedIssue.relatedCriterion as keyof typeof CRITERIA_NAMES]}</strong></span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingSuggestions ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-3 text-muted-foreground">Generating personalized improvement tips...</span>
+            </div>
+          ) : improvementSuggestions ? (
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                {improvementSuggestions}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              Failed to load suggestions. Please try again.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
