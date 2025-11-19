@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { getGeminiModel } from "@/lib/gemini-native"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 60
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +13,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Missing issueName" }, { status: 400 })
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    const model = getGeminiModel()
 
     // Create a detailed prompt for generating improvement suggestions
     const prompt = `You are an IELTS writing tutor helping a student improve their writing. The student has a recurring issue in their essays.
@@ -41,7 +40,12 @@ Please provide detailed, actionable guidance on how to improve this specific iss
 Format your response in a clear, structured way that's easy to understand and apply. Be encouraging and constructive.`
 
     // Use server-side rate limiting to prevent quota exhaustion
-    const result = await withRateLimit(() => model.generateContent(prompt))
+    const result = await withRateLimit(() =>
+      retryWithBackoff(
+        () => model.generateContent(prompt),
+        GEMINI_RETRY_CONFIG
+      )
+    )
     const response = result.response
     const text = response.text()
 
