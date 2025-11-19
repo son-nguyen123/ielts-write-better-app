@@ -16,16 +16,23 @@ interface TableOfContentsProps {
   items?: TOCItem[]
   className?: string
   defaultCollapsed?: boolean
+  onToggle?: (collapsed: boolean) => void
 }
 
 export function TableOfContents({ 
   items, 
   className,
-  defaultCollapsed = false 
+  defaultCollapsed = false,
+  onToggle
 }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>("")
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   const [tocItems, setTocItems] = useState<TOCItem[]>(items || [])
+  
+  // Notify parent of toggle state changes
+  useEffect(() => {
+    onToggle?.(isCollapsed)
+  }, [isCollapsed, onToggle])
 
   // Auto-detect headings from the page if items not provided
   useEffect(() => {

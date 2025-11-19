@@ -16,7 +16,7 @@ import { subscribeToTasks } from "@/lib/firebase-firestore"
 import { TargetSetting } from "@/components/reports/target-setting"
 import { SkillPriorityVisualization } from "@/components/reports/skill-priority-visualization"
 import { OverviewCards } from "@/components/reports/overview-cards"
-import { TableOfContents } from "@/components/ui/table-of-contents"
+import { PageWithTOC } from "@/components/ui/page-with-toc"
 import type { TaskDocument, CriterionKey } from "@/types/tasks"
 import type { ProgressReportData, UserTarget } from "@/types/reports"
 
@@ -264,9 +264,8 @@ export default function DashboardPage() {
       <div className="min-h-screen">
         <TopNav />
         <SecondaryNav />
-        <TableOfContents />
-
-        <div className="container mx-auto px-4 py-8">
+        <PageWithTOC>
+          <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2" id="welcome" data-toc-title="Welcome">Welcome back, {user?.displayName || "User"}</h1>
@@ -626,6 +625,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+      </PageWithTOC>
       </div>
     </ProtectedRoute>
   )
