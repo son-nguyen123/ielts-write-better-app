@@ -210,10 +210,10 @@ export function NewTaskForm() {
   }
 
   return (
-    <div>
+    <div className="pb-24 sm:pb-20">
       <h1 className="text-3xl font-bold mb-6">New Task</h1>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-6 mb-20 sm:mb-16">
         {/* Left: Pick a Prompt */}
         <Card className="rounded-2xl border-border bg-card">
           <CardHeader>
@@ -315,7 +315,7 @@ export function NewTaskForm() {
               {taskType === "Task 2" && " (present your argument)"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pb-8">
             <Textarea
               value={response}
               onChange={(e) => setResponse(e.target.value)}
