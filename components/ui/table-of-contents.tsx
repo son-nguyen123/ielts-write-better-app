@@ -103,7 +103,7 @@ export function TableOfContents({
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)
     if (element) {
-      const yOffset = -100 // Offset for fixed headers
+      const yOffset = -120 // Offset for fixed headers (TopNav 64px + SecondaryNav ~56px)
       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
       window.scrollTo({ top: y, behavior: "smooth" })
     }
@@ -117,7 +117,7 @@ export function TableOfContents({
     <div
       data-toc-container
       className={cn(
-        "fixed top-24 left-4 z-40 transition-all duration-300",
+        "fixed top-[7.5rem] left-4 z-30 transition-all duration-300",
         isCollapsed ? "w-12" : "w-64",
         className
       )}
