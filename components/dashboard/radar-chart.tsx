@@ -27,6 +27,26 @@ const CRITERIA_FULL_NAMES: Record<CriterionKey, string> = {
   GRA: "Grammar & Accuracy"
 }
 
+// Vibrant color palette for each criterion
+const CRITERIA_COLORS: Record<CriterionKey, { stroke: string; fill: string }> = {
+  TR: {
+    stroke: "rgba(79, 70, 229, 1)",      // Indigo
+    fill: "rgba(79, 70, 229, 0.25)"
+  },
+  CC: {
+    stroke: "rgba(34, 197, 94, 1)",      // Emerald
+    fill: "rgba(34, 197, 94, 0.25)"
+  },
+  LR: {
+    stroke: "rgba(249, 115, 22, 1)",     // Orange
+    fill: "rgba(249, 115, 22, 0.25)"
+  },
+  GRA: {
+    stroke: "rgba(236, 72, 153, 1)",     // Pink
+    fill: "rgba(236, 72, 153, 0.25)"
+  }
+}
+
 export function RadarChart({ scores, target = 7.5, beforeScores, isLoading }: RadarChartProps) {
   if (isLoading) {
     return (
@@ -46,55 +66,47 @@ export function RadarChart({ scores, target = 7.5, beforeScores, isLoading }: Ra
     )
   }
 
+  // Create data with each criterion as a separate point
   const data = CRITERIA_ORDER.map((criterion) => ({
     criteria: CRITERIA_FULL_NAMES[criterion],
-    current: scores?.[criterion] ?? 0,
-    target,
-    before: beforeScores?.[criterion] ?? undefined,
+    [criterion]: scores?.[criterion] ?? 0,
   }))
 
   return (
     <ResponsiveContainer width="100%" height={300}>
       <RechartsRadar data={data}>
-        <PolarGrid stroke="hsl(var(--border))" strokeWidth={1.5} />
+        {/* Grid with light gray color */}
+        <PolarGrid stroke="#E5E7EB" strokeWidth={1} />
+        
+        {/* Axis labels with dark gray color */}
         <PolarAngleAxis 
           dataKey="criteria" 
-          tick={{ fill: "hsl(var(--foreground))", fontSize: 11, fontWeight: 500 }} 
+          tick={{ fill: "#374151", fontSize: 12, fontWeight: 500 }} 
         />
+        
         <PolarRadiusAxis 
           angle={90} 
           domain={[0, 9]} 
-          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+          tick={{ fill: "#6B7280", fontSize: 11 }}
           tickCount={10}
         />
-        {beforeScores && (
-          <Radar
-            name="Before"
-            dataKey="before"
-            stroke="hsl(var(--muted-foreground))"
-            fill="hsl(var(--muted-foreground))"
-            fillOpacity={0.2}
-            strokeWidth={2}
-            strokeDasharray="3 3"
-          />
-        )}
-        <Radar
-          name="Current"
-          dataKey="current"
-          stroke="hsl(var(--primary))"
-          fill="hsl(var(--primary))"
-          fillOpacity={0.5}
-          strokeWidth={2}
-        />
-        <Radar 
-          name="Target" 
-          dataKey="target" 
-          stroke="hsl(var(--accent))" 
-          fill="hsl(var(--accent))" 
-          fillOpacity={0.2}
-          strokeWidth={2}
-          strokeDasharray="5 5"
-        />
+        
+        {/* Each criterion rendered as a separate colored radar area */}
+        {CRITERIA_ORDER.map((criterion) => {
+          const colors = CRITERIA_COLORS[criterion]
+          return (
+            <Radar
+              key={criterion}
+              name={CRITERIA_FULL_NAMES[criterion]}
+              dataKey={criterion}
+              stroke={colors.stroke}
+              fill={colors.fill}
+              strokeWidth={2.5}
+              dot={{ fill: colors.stroke, r: 4 }}
+            />
+          )
+        })}
+        
         <Legend 
           wrapperStyle={{ paddingTop: "10px" }}
           iconType="circle"
