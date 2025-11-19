@@ -144,8 +144,14 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
 
   if (!userId) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Please sign in to view your progress reports.</p>
+      <div>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2" id="progress-reports" data-toc-title="Progress Reports">Progress Reports</h1>
+          <p className="text-muted-foreground">Track your improvement over time and reach your targets</p>
+        </div>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Please sign in to view your progress reports.</p>
+        </div>
       </div>
     )
   }
