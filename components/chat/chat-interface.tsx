@@ -191,15 +191,88 @@ export function ChatInterface() {
     }
   }
 
-  const handleQuickAction = (action: string) => {
-    if (!selectedEssay) return
+  const handleQuickAction = async (action: string) => {
+    if (!selectedEssay || isLoading) return
     
-    setInput(action)
-    // Automatically send the message
-    setTimeout(() => {
-      const event = new KeyboardEvent('keydown', { key: 'Enter' })
-      handleSend()
-    }, 100)
+    const userMessage: Message = { role: "user", content: action }
+    setMessages((prev) => [...prev, userMessage])
+    setIsLoading(true)
+
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+          tone,
+          level,
+          model: selectedModel || undefined,
+          attachedTask: {
+            prompt: selectedEssay.prompt,
+            essay: selectedEssay.response,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        let errorMessage = `Request failed with status ${response.status}`
+        try {
+          const data = await response.json()
+          if (data?.error && typeof data.error === "string") {
+            errorMessage = data.error
+          }
+        } catch (jsonError) {
+          console.error("Failed to parse error response", jsonError)
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("Chat response did not include a readable stream")
+      }
+      const decoder = new TextDecoder()
+      let assistantMessage = ""
+
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        assistantMessage += chunk
+
+        setMessages((prev) => {
+          const newMessages = [...prev]
+          if (newMessages[newMessages.length - 1]?.role === "assistant") {
+            newMessages[newMessages.length - 1].content = assistantMessage
+          }
+          return newMessages
+        })
+      }
+    } catch (error) {
+      console.error("[v0] Error in chat:", error)
+      
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const isRateLimitError = 
+        errorMessage.toLowerCase().includes("vượt giới hạn") ||
+        errorMessage.toLowerCase().includes("rate limit") ||
+        errorMessage.toLowerCase().includes("quota") ||
+        errorMessage.toLowerCase().includes("too many requests")
+      
+      const responseMessage = isRateLimitError 
+        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+        : "Sorry, I encountered an error. Please try again."
+      
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: responseMessage },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
