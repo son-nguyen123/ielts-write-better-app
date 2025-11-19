@@ -120,7 +120,7 @@ export function TableOfContents({
   const containerClasses = variant === "sidebar"
     ? cn(
         "sticky top-24 h-[calc(100vh-6rem)] transition-all duration-300",
-        isCollapsed ? "w-0 overflow-hidden" : "w-64",
+        isCollapsed ? "w-16" : "w-64",
         className
       )
     : cn(

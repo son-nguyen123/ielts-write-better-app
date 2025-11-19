@@ -47,7 +47,7 @@ export function PageWithTOC({
         <div
           className={cn(
             "flex-shrink-0 transition-all duration-300",
-            isCollapsed ? "w-0" : "w-64"
+            isCollapsed ? "w-16" : "w-64"
           )}
         >
           <TableOfContents
