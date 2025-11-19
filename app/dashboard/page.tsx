@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { FileText, Flame, PenLine, MessageSquare, TrendingUp, Target, Loader2 } from "lucide-react"
+import { FileText, Flame, PenLine, MessageSquare, TrendingUp, Target, Loader2, BookOpen, Lightbulb } from "lucide-react"
 
 import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
@@ -13,7 +13,11 @@ import { RadarChart } from "@/components/dashboard/radar-chart"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
 import { subscribeToTasks } from "@/lib/firebase-firestore"
+import { TargetSetting } from "@/components/reports/target-setting"
+import { SkillPriorityVisualization } from "@/components/reports/skill-priority-visualization"
+import { OverviewCards } from "@/components/reports/overview-cards"
 import type { TaskDocument, CriterionKey } from "@/types/tasks"
+import type { ProgressReportData, UserTarget } from "@/types/reports"
 
 const CRITERIA_ORDER: CriterionKey[] = ["TR", "CC", "LR", "GRA"]
 
@@ -105,6 +109,9 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<TaskDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [reportData, setReportData] = useState<ProgressReportData | null>(null)
+  const [userTarget, setUserTarget] = useState<UserTarget | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -136,6 +143,62 @@ export default function DashboardPage() {
       unsubscribe()
     }
   }, [user])
+
+  // Fetch user target on mount
+  useEffect(() => {
+    if (!user) return
+    
+    async function fetchTarget() {
+      try {
+        const response = await fetch(`/api/reports/target?userId=${user.uid}`)
+        if (response.ok) {
+          const data = await response.json()
+          setUserTarget(data.target)
+        }
+      } catch (err) {
+        console.error("Error fetching target:", err)
+      }
+    }
+    
+    fetchTarget()
+  }, [user])
+
+  // Fetch report data for enhanced dashboard
+  useEffect(() => {
+    if (!user) return
+
+    async function fetchReportData() {
+      setReportLoading(true)
+      try {
+        const response = await fetch("/api/reports/progress", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            dateRange: 30,
+            targetBand: userTarget?.targetOverallBand
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setReportData(data)
+        }
+      } catch (err) {
+        console.error("Error fetching report data:", err)
+      } finally {
+        setReportLoading(false)
+      }
+    }
+
+    fetchReportData()
+  }, [user, userTarget])
+
+  function handleTargetSaved(target: UserTarget) {
+    setUserTarget(target)
+  }
 
   const latestScoredTask = useMemo(() => {
     return tasks.find((task) => {
@@ -206,12 +269,103 @@ export default function DashboardPage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.displayName || "User"}</h1>
             <p className="text-muted-foreground">
-              Your target band: <span className="text-primary font-semibold">7.5</span>. Keep going!
+              {userTarget ? (
+                <>
+                  Your target band: <span className="text-primary font-semibold">{userTarget.targetOverallBand.toFixed(1)}</span>. Keep going!
+                </>
+              ) : (
+                <>Set your target band to get personalized recommendations!</>
+              )}
             </p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
+          {/* Enhanced Overview Cards */}
+          {reportData && !reportLoading && reportData.totalSubmissions > 0 && (
+            <div className="mb-8">
+              <OverviewCards
+                currentAverage={reportData.currentOverallAverage}
+                bestRecentScore={reportData.bestRecentScore}
+                totalSubmissions={reportData.totalSubmissions}
+                gapToTarget={
+                  userTarget 
+                    ? userTarget.targetOverallBand - reportData.currentOverallAverage
+                    : undefined
+                }
+              />
+            </div>
+          )}
+
+          {/* Target Setting and Skill Priority Section */}
+          {user && reportData && !reportLoading && reportData.totalSubmissions > 0 && (
+            <div className="grid lg:grid-cols-3 gap-6 mb-8">
+              <div className="lg:col-span-1">
+                <TargetSetting
+                  userId={user.uid}
+                  onTargetSaved={handleTargetSaved}
+                  currentTarget={userTarget}
+                />
+              </div>
+              
+              {userTarget && reportData.targetBasedRecommendations && (
+                <div className="lg:col-span-2">
+                  <SkillPriorityVisualization
+                    skillPriority={reportData.targetBasedRecommendations.skillPriority}
+                    currentAverage={reportData.currentOverallAverage}
+                    targetBand={userTarget.targetOverallBand}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Key Recommendations - Eye-catching section */}
+          {reportData && !reportLoading && reportData.targetBasedRecommendations && reportData.targetBasedRecommendations.repeatedSuggestions.length > 0 && (
+            <Card className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent mb-8">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="h-6 w-6 text-primary" />
+                  <CardTitle className="text-2xl">Focus on These to Improve Fast!</CardTitle>
+                </div>
+                <CardDescription className="text-base">
+                  Top issues holding you back - tackle these first for maximum impact
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {reportData.targetBasedRecommendations.repeatedSuggestions.slice(0, 4).map((suggestion, index) => (
+                    <div 
+                      key={index} 
+                      className="p-4 rounded-xl bg-card border-2 border-border hover:border-primary/50 transition-all hover:shadow-lg"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-primary font-bold">{index + 1}</span>
+                        </div>
+                        <div className="flex-1">
+                          <Badge variant="outline" className="mb-2">
+                            {suggestion.relatedSkill}
+                          </Badge>
+                          <p className="text-sm font-medium leading-relaxed">{suggestion.suggestion}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Appeared {suggestion.count} times in your feedback
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                  <p className="text-sm font-medium text-center">
+                    💡 <strong>Pro Tip:</strong> Focus on fixing these issues in your next 2-3 essays to see rapid improvement!
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Stats Cards - fallback when no report data */}
+          {(!reportData || reportData.totalSubmissions === 0) && (
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
             <Card className="rounded-2xl border-border bg-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Latest Overall Score</CardTitle>
@@ -294,6 +448,77 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+          )}
+
+          {/* Personalized Study Plan */}
+          {reportData && !reportLoading && reportData.targetBasedRecommendations && (
+            <Card className="rounded-2xl border-border bg-card mb-8">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-xl">Your Personalized Study Plan</CardTitle>
+                </div>
+                <CardDescription>Recommended actions to reach your target faster</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Practice Frequency */}
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <PenLine className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Practice Goal</h3>
+                        <p className="text-sm text-muted-foreground">Recommended frequency</p>
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold mb-1">
+                      {reportData.targetBasedRecommendations.studyPlan.weeklyTasksRecommended} essays/week
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      to reach your target in {reportData.targetBasedRecommendations.studyPlan.estimatedTimeToTarget}
+                    </p>
+                  </div>
+
+                  {/* Focus Skills */}
+                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                        <Target className="h-5 w-5 text-accent" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Priority Skills</h3>
+                        <p className="text-sm text-muted-foreground">Focus your practice on</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {reportData.targetBasedRecommendations.studyPlan.focusSkills.map((skill) => (
+                        <Badge key={skill} variant="default" className="text-sm px-3 py-1">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Task Type Recommendations */}
+                {reportData.targetBasedRecommendations.studyPlan.taskTypeRecommendations.length > 0 && (
+                  <div className="mt-6 p-4 rounded-lg bg-accent/10 border border-accent/20">
+                    <h3 className="font-semibold mb-3">📝 What to Practice</h3>
+                    <ul className="space-y-2">
+                      {reportData.targetBasedRecommendations.studyPlan.taskTypeRecommendations.map((rec, index) => (
+                        <li key={index} className="text-sm flex items-start gap-2">
+                          <span className="text-primary font-bold">•</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Progress Chart */}
           <div className="grid lg:grid-cols-2 gap-6 mb-8">
