@@ -16,16 +16,27 @@ interface TableOfContentsProps {
   items?: TOCItem[]
   className?: string
   defaultCollapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
+  variant?: "fixed" | "sidebar"
 }
 
 export function TableOfContents({ 
   items, 
   className,
-  defaultCollapsed = false 
+  defaultCollapsed = false,
+  onCollapsedChange,
+  variant = "fixed"
 }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>("")
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   const [tocItems, setTocItems] = useState<TOCItem[]>(items || [])
+
+  // Notify parent component when collapse state changes
+  const handleCollapseToggle = () => {
+    const newState = !isCollapsed
+    setIsCollapsed(newState)
+    onCollapsedChange?.(newState)
+  }
 
   // Auto-detect headings from the page if items not provided
   useEffect(() => {
@@ -106,14 +117,22 @@ export function TableOfContents({
     return null
   }
 
-  return (
-    <div
-      data-toc-container
-      className={cn(
+  const containerClasses = variant === "sidebar"
+    ? cn(
+        "sticky top-24 h-[calc(100vh-6rem)] transition-all duration-300",
+        isCollapsed ? "w-0 overflow-hidden" : "w-64",
+        className
+      )
+    : cn(
         "fixed top-24 left-4 z-40 transition-all duration-300",
         isCollapsed ? "w-12" : "w-64",
         className
-      )}
+      )
+
+  return (
+    <div
+      data-toc-container
+      className={containerClasses}
     >
       <div className="rounded-lg border bg-card shadow-lg">
         <div className="flex items-center justify-between p-3 border-b">
@@ -126,7 +145,7 @@ export function TableOfContents({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={handleCollapseToggle}
             className={cn("h-8 w-8 p-0", isCollapsed && "mx-auto")}
             aria-label={isCollapsed ? "Expand table of contents" : "Collapse table of contents"}
           >
