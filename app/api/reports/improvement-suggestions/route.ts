@@ -6,7 +6,7 @@ export const maxDuration = 60
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
-async function generateImprovementSuggestions(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const { issueName, relatedCriterion, userLevel } = await req.json()
 
@@ -40,7 +40,8 @@ Please provide detailed, actionable guidance on how to improve this specific iss
 
 Format your response in a clear, structured way that's easy to understand and apply. Be encouraging and constructive.`
 
-    const result = await model.generateContent(prompt)
+    // Use server-side rate limiting to prevent quota exhaustion
+    const result = await withRateLimit(() => model.generateContent(prompt))
     const response = result.response
     const text = response.text()
 
@@ -71,5 +72,3 @@ function getCriterionFullName(criterion: string): string {
   }
   return names[criterion] || criterion
 }
-
-export const POST = withRateLimit(generateImprovementSuggestions)
