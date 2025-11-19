@@ -132,9 +132,9 @@ export function TableOfContents({
           )}
           <Button
             variant="ghost"
-            size="sm"
+            size="icon-sm"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className={cn("h-8 w-8 p-0", isCollapsed && "mx-auto")}
+            className={cn("shrink-0", isCollapsed && "mx-auto")}
             aria-label={isCollapsed ? "Expand table of contents" : "Collapse table of contents"}
           >
             {isCollapsed ? (
