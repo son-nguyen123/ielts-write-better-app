@@ -17,7 +17,7 @@ export function SecondaryNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="border-b border-border bg-card">
+    <nav className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 sticky top-16 z-40">
       <div className="container mx-auto px-4">
         <div className="flex items-center gap-1 overflow-x-auto">
           {navItems.map((item) => {
