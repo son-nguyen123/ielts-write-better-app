@@ -9,14 +9,19 @@ import {
   calculateCriteriaBreakdown,
   extractCommonIssues,
   generatePersonalizedFeedback,
-  calculateOverallTrendString
+  calculateOverallTrendString,
+  calculateCurrentOverallAverage,
+  calculateBestRecentScore,
+  calculateTaskTypeStats,
+  getRecentSubmissions,
+  generateTargetBasedRecommendations
 } from "@/lib/report-analytics"
 
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, dateRange } = await req.json()
+    const { userId, dateRange, taskType, targetBand } = await req.json()
 
     if (!userId) {
       return Response.json({ error: "Missing userId" }, { status: 400 })
@@ -30,11 +35,15 @@ export async function POST(req: NextRequest) {
     const allTasks = (await getTasks(userId)) as TaskDocument[]
     
     // Filter tasks that have been scored (have overallBand)
-    // Note: We don't filter by status because scored tasks can have different status values
-    const scoredTasks = allTasks.filter(task => 
+    let scoredTasks = allTasks.filter(task => 
       task.overallBand !== undefined && 
       task.createdAt
     )
+    
+    // Apply task type filter if provided
+    if (taskType && taskType !== "all") {
+      scoredTasks = scoredTasks.filter(task => task.taskType === taskType)
+    }
 
     if (scoredTasks.length === 0) {
       // Return empty state
@@ -60,7 +69,12 @@ export async function POST(req: NextRequest) {
           weaknesses: [],
           recommendations: []
         },
-        overallScoreTrendValue: "+0.0 since start"
+        overallScoreTrendValue: "+0.0 since start",
+        currentOverallAverage: 0,
+        bestRecentScore: 0,
+        totalSubmissions: 0,
+        taskTypeStats: [],
+        recentSubmissions: []
       } as ProgressReportData)
     }
 
@@ -78,6 +92,12 @@ export async function POST(req: NextRequest) {
       commonIssues
     )
     const overallScoreTrendValue = calculateOverallTrendString(overallScoreTrend)
+    
+    // New analytics
+    const currentOverallAverage = calculateCurrentOverallAverage(filteredTasks)
+    const bestRecentScore = calculateBestRecentScore(scoredTasks, dateRange)
+    const taskTypeStats = calculateTaskTypeStats(scoredTasks)
+    const recentSubmissions = getRecentSubmissions(scoredTasks, 10)
 
     // Calculate practice time metrics
     const practiceTime = calculatePracticeTime(allTasks)
@@ -89,7 +109,23 @@ export async function POST(req: NextRequest) {
       criteriaBreakdown,
       commonIssues,
       personalizedFeedback,
-      overallScoreTrendValue
+      overallScoreTrendValue,
+      currentOverallAverage,
+      bestRecentScore,
+      totalSubmissions: scoredTasks.length,
+      taskTypeStats,
+      recentSubmissions
+    }
+    
+    // Add target-based recommendations if target is provided
+    if (targetBand && targetBand >= 5.0 && targetBand <= 9.0) {
+      reportData.targetBasedRecommendations = generateTargetBasedRecommendations(
+        scoredTasks,
+        criteriaBreakdown,
+        targetBand,
+        currentOverallAverage,
+        taskTypeStats
+      )
     }
 
     return Response.json(reportData)

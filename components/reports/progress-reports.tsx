@@ -4,11 +4,17 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, AlertCircle, Loader2 } from "lucide-react"
+import { Select } from "@/components/ui/select"
+import { TrendingUp, TrendingDown, AlertCircle, Loader2, Filter } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts"
 import { RadarChart } from "@/components/dashboard/radar-chart"
 import { useAuth } from "@/lib/firebase-auth"
-import type { ProgressReportData } from "@/types/reports"
+import { OverviewCards } from "./overview-cards"
+import { TargetSetting } from "./target-setting"
+import { SkillPriorityVisualization } from "./skill-priority-visualization"
+import { TargetRecommendations } from "./target-recommendations"
+import { RecentSubmissionsTable } from "./recent-submissions-table"
+import type { ProgressReportData, UserTarget } from "@/types/reports"
 
 // Criteria full names for better clarity
 const CRITERIA_NAMES = {
@@ -25,11 +31,32 @@ interface ProgressReportsProps {
 export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {}) {
   const { user } = useAuth()
   const [dateRange, setDateRange] = useState<"7" | "30" | "90">("30")
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>("all")
   const [reportData, setReportData] = useState<ProgressReportData | null>(null)
+  const [userTarget, setUserTarget] = useState<UserTarget | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const userId = propUserId || user?.uid
+
+  // Fetch user target on mount
+  useEffect(() => {
+    if (!userId) return
+    
+    async function fetchTarget() {
+      try {
+        const response = await fetch(`/api/reports/target?userId=${userId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setUserTarget(data.target)
+        }
+      } catch (err) {
+        console.error("Error fetching target:", err)
+      }
+    }
+    
+    fetchTarget()
+  }, [userId])
 
   useEffect(() => {
     if (!userId) {
@@ -38,7 +65,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
     }
 
     fetchReportData()
-  }, [userId, dateRange])
+  }, [userId, dateRange, taskTypeFilter, userTarget])
 
   async function fetchReportData() {
     if (!userId) return
@@ -55,6 +82,8 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
         body: JSON.stringify({
           userId,
           dateRange: parseInt(dateRange),
+          taskType: taskTypeFilter === "all" ? undefined : taskTypeFilter,
+          targetBand: userTarget?.targetOverallBand
         }),
       })
 
@@ -70,6 +99,10 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleTargetSaved(target: UserTarget) {
+    setUserTarget(target)
   }
 
   if (!userId) {
@@ -149,11 +182,43 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
   const isPositive = trendValue.startsWith("+")
   const isNegative = trendValue.startsWith("-")
 
+  // Prepare data for task type bar chart
+  const taskTypeChartData = reportData.taskTypeStats.map(stat => ({
+    taskType: stat.taskType,
+    average: stat.averageOverall
+  }))
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Progress Reports</h1>
-        <p className="text-muted-foreground">Track your improvement over time</p>
+        <p className="text-muted-foreground">Track your improvement over time and reach your targets</p>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6 flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Filters:</span>
+        </div>
+        
+        <Tabs value={dateRange} onValueChange={(value) => setDateRange(value as "7" | "30" | "90")}>
+          <TabsList>
+            <TabsTrigger value="7">7 days</TabsTrigger>
+            <TabsTrigger value="30">30 days</TabsTrigger>
+            <TabsTrigger value="90">90 days</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <select
+          value={taskTypeFilter}
+          onChange={(e) => setTaskTypeFilter(e.target.value)}
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="all">All Task Types</option>
+          <option value="Task 1">Task 1</option>
+          <option value="Task 2">Task 2</option>
+        </select>
       </div>
 
       {reportData.overallScoreTrend.length === 0 ? (
@@ -169,6 +234,42 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
         </Card>
       ) : (
         <>
+          {/* Overview Cards */}
+          <div className="mb-6">
+            <OverviewCards
+              currentAverage={reportData.currentOverallAverage}
+              bestRecentScore={reportData.bestRecentScore}
+              totalSubmissions={reportData.totalSubmissions}
+              gapToTarget={
+                userTarget 
+                  ? userTarget.targetOverallBand - reportData.currentOverallAverage
+                  : undefined
+              }
+            />
+          </div>
+
+          {/* Target Setting and Skill Priority */}
+          {userId && (
+            <div className="grid lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-1">
+                <TargetSetting
+                  userId={userId}
+                  onTargetSaved={handleTargetSaved}
+                  currentTarget={userTarget}
+                />
+              </div>
+              
+              {userTarget && reportData.targetBasedRecommendations && (
+                <div className="lg:col-span-2">
+                  <SkillPriorityVisualization
+                    skillPriority={reportData.targetBasedRecommendations.skillPriority}
+                    currentAverage={reportData.currentOverallAverage}
+                    targetBand={userTarget.targetOverallBand}
+                  />
+                </div>
+              )}
+            </div>
+          )}
           {/* Overall Trend */}
           <Card className="rounded-2xl border-border bg-card mb-6">
             <CardHeader>
@@ -319,6 +420,42 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
               </CardContent>
             </Card>
           </div>
+
+          {/* Task Type Performance Bar Chart */}
+          {taskTypeChartData.length > 0 && (
+            <Card className="rounded-2xl border-border bg-card mb-6">
+              <CardHeader>
+                <CardTitle className="text-2xl">Performance by Task Type</CardTitle>
+                <CardDescription className="text-base">Average scores across different task types</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={taskTypeChartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                    <XAxis 
+                      dataKey="taskType" 
+                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
+                      tickLine={{ stroke: "hsl(var(--border))" }}
+                    />
+                    <YAxis
+                      domain={[0, 9]}
+                      ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
+                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
+                      tickLine={{ stroke: "hsl(var(--border))" }}
+                      label={{ value: "Band Score", angle: -90, position: "insideLeft", style: { fill: "hsl(var(--foreground))", fontSize: 14 } }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar 
+                      dataKey="average" 
+                      fill="hsl(var(--primary))" 
+                      radius={[8, 8, 0, 0]}
+                      name="Average Score"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Detailed Criteria Trends */}
           {criteriaData.length > 0 && (
@@ -489,6 +626,23 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
               )}
             </CardContent>
           </Card>
+
+          {/* Target-Based Recommendations */}
+          {userTarget && reportData.targetBasedRecommendations && (
+            <div className="mt-6">
+              <TargetRecommendations
+                studyPlan={reportData.targetBasedRecommendations.studyPlan}
+                repeatedSuggestions={reportData.targetBasedRecommendations.repeatedSuggestions}
+              />
+            </div>
+          )}
+
+          {/* Recent Submissions */}
+          {reportData.recentSubmissions && reportData.recentSubmissions.length > 0 && (
+            <div className="mt-6">
+              <RecentSubmissionsTable submissions={reportData.recentSubmissions} />
+            </div>
+          )}
         </>
       )}
     </div>
