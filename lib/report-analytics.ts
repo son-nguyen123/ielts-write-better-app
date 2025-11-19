@@ -391,3 +391,294 @@ export function calculateOverallTrendString(scoreTrend: WeeklyScoreData[]): stri
   const sign = diff >= 0 ? "+" : ""
   return `${sign}${diff.toFixed(1)} since start`
 }
+
+/**
+ * Calculate current overall average
+ */
+export function calculateCurrentOverallAverage(tasks: TaskDocument[]): number {
+  const scores = tasks
+    .filter(task => task.overallBand !== undefined)
+    .map(task => task.overallBand!)
+  
+  return calculateAverage(scores)
+}
+
+/**
+ * Calculate best recent score (within a time range)
+ */
+export function calculateBestRecentScore(tasks: TaskDocument[], days: number = 30): number {
+  const recentTasks = filterTasksByDateRange(tasks, days as 7 | 30 | 90)
+  const scores = recentTasks
+    .filter(task => task.overallBand !== undefined)
+    .map(task => task.overallBand!)
+  
+  return scores.length > 0 ? Math.max(...scores) : 0
+}
+
+/**
+ * Calculate statistics by task type
+ */
+export function calculateTaskTypeStats(tasks: TaskDocument[]): import("@/types/reports").TaskTypeStats[] {
+  const taskTypeMap = new Map<string, number[]>()
+  
+  tasks.forEach(task => {
+    if (task.overallBand === undefined) return
+    
+    const taskType = task.taskType || "Unknown"
+    if (!taskTypeMap.has(taskType)) {
+      taskTypeMap.set(taskType, [])
+    }
+    taskTypeMap.get(taskType)!.push(task.overallBand)
+  })
+  
+  const stats: import("@/types/reports").TaskTypeStats[] = []
+  taskTypeMap.forEach((scores, taskType) => {
+    stats.push({
+      taskType,
+      averageOverall: calculateAverage(scores),
+      count: scores.length
+    })
+  })
+  
+  return stats.sort((a, b) => b.count - a.count)
+}
+
+/**
+ * Get recent submissions with key information
+ */
+export function getRecentSubmissions(
+  tasks: TaskDocument[], 
+  limit: number = 10
+): import("@/types/reports").RecentSubmission[] {
+  const sortedTasks = [...tasks]
+    .filter(task => task.overallBand !== undefined && task.feedback)
+    .sort((a, b) => {
+      if (!a.updatedAt || !b.updatedAt) return 0
+      return b.updatedAt.toMillis() - a.updatedAt.toMillis()
+    })
+    .slice(0, limit)
+  
+  return sortedTasks.map(task => {
+    // Find weakest skill
+    const criteria = task.feedback?.criteria
+    const skillScores: Array<{ skill: CriterionKey; score: number }> = []
+    
+    if (criteria) {
+      (["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(skill => {
+        const score = criteria[skill]?.score
+        if (score !== undefined) {
+          skillScores.push({ skill, score })
+        }
+      })
+    }
+    
+    skillScores.sort((a, b) => a.score - b.score)
+    const weakest = skillScores[0] || { skill: "TR" as CriterionKey, score: 0 }
+    
+    // Get key suggestion from weakest skill
+    const keySuggestion = criteria?.[weakest.skill]?.suggestions?.[0] || 
+                         criteria?.[weakest.skill]?.issues?.[0] ||
+                         "Continue practicing"
+    
+    return {
+      id: task.id,
+      title: task.title || "Untitled Essay",
+      taskType: task.taskType || "Unknown",
+      overallBand: task.overallBand!,
+      weakestSkill: weakest.skill,
+      weakestSkillScore: weakest.score,
+      keySuggestion,
+      createdAt: task.updatedAt?.toDate().toISOString() || new Date().toISOString()
+    }
+  })
+}
+
+/**
+ * Calculate skill priority based on target
+ */
+export function calculateSkillPriority(
+  criteriaBreakdown: import("@/types/reports").CriteriaBreakdown,
+  targetBand: number
+): import("@/types/reports").SkillPriority {
+  const skills: CriterionKey[] = ["TR", "CC", "LR", "GRA"]
+  const skillGaps: Array<{ skill: CriterionKey; gap: import("@/types/reports").SkillGap }> = []
+  
+  skills.forEach(skill => {
+    const current = criteriaBreakdown[skill]
+    const gap = targetBand - current
+    
+    let priority: "high" | "medium" | "low" = "low"
+    if (gap >= 1.5) priority = "high"
+    else if (gap >= 0.5) priority = "medium"
+    
+    skillGaps.push({
+      skill,
+      gap: {
+        current,
+        target: targetBand,
+        gap,
+        priority
+      }
+    })
+  })
+  
+  // Sort by gap (highest gap = weakest skill)
+  skillGaps.sort((a, b) => b.gap.gap - a.gap.gap)
+  
+  const result: any = {}
+  skillGaps.forEach(({ skill, gap }) => {
+    result[skill] = gap
+  })
+  
+  result.primaryWeakSkill = skillGaps[0].skill
+  result.secondaryWeakSkill = skillGaps[1]?.skill || skillGaps[0].skill
+  
+  return result as import("@/types/reports").SkillPriority
+}
+
+/**
+ * Extract repeated suggestions from feedback
+ */
+export function extractRepeatedSuggestions(
+  tasks: TaskDocument[]
+): import("@/types/reports").RepeatedSuggestion[] {
+  const suggestionMap = new Map<string, { count: number; skill: CriterionKey }>()
+  
+  tasks.forEach(task => {
+    if (!task.feedback) return
+    
+    const criteria = task.feedback.criteria
+    ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(skill => {
+      const suggestions = criteria[skill]?.suggestions || []
+      const issues = criteria[skill]?.issues || []
+      
+      [...suggestions, ...issues].forEach(text => {
+        // Normalize the text for better matching
+        const normalized = text.toLowerCase().trim()
+        
+        // Group similar suggestions
+        let found = false
+        suggestionMap.forEach((value, key) => {
+          if (key.includes(normalized.slice(0, 30)) || normalized.includes(key.slice(0, 30))) {
+            value.count++
+            found = true
+          }
+        })
+        
+        if (!found) {
+          suggestionMap.set(normalized, { count: 1, skill })
+        }
+      })
+    })
+  })
+  
+  const suggestions: import("@/types/reports").RepeatedSuggestion[] = []
+  suggestionMap.forEach((value, key) => {
+    if (value.count >= 2) { // Only include if appeared at least twice
+      suggestions.push({
+        suggestion: key,
+        count: value.count,
+        relatedSkill: value.skill
+      })
+    }
+  })
+  
+  return suggestions
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+}
+
+/**
+ * Generate study plan based on target and current performance
+ */
+export function generateStudyPlan(
+  skillPriority: import("@/types/reports").SkillPriority,
+  targetBand: number,
+  currentAverage: number,
+  taskTypeStats: import("@/types/reports").TaskTypeStats[]
+): import("@/types/reports").StudyPlan {
+  const totalGap = targetBand - currentAverage
+  
+  // Calculate recommended weekly tasks (more gap = more practice)
+  let weeklyTasks = 2
+  if (totalGap >= 1.5) weeklyTasks = 4
+  else if (totalGap >= 1.0) weeklyTasks = 3
+  
+  // Identify focus skills (high priority)
+  const focusSkills: Array<CriterionKey> = []
+  ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(skill => {
+    if (skillPriority[skill].priority === "high") {
+      focusSkills.push(skill)
+    }
+  })
+  
+  // If no high priority, add medium priority
+  if (focusSkills.length === 0) {
+    ;(["TR", "CC", "LR", "GRA"] as CriterionKey[]).forEach(skill => {
+      if (skillPriority[skill].priority === "medium") {
+        focusSkills.push(skill)
+      }
+    })
+  }
+  
+  // If still none, add the weakest
+  if (focusSkills.length === 0) {
+    focusSkills.push(skillPriority.primaryWeakSkill)
+  }
+  
+  // Task type recommendations
+  const taskTypeRecommendations: string[] = []
+  if (taskTypeStats.length > 0) {
+    // Recommend task types with lower average scores
+    const sortedByScore = [...taskTypeStats].sort((a, b) => a.averageOverall - b.averageOverall)
+    if (sortedByScore[0] && sortedByScore[0].averageOverall < targetBand) {
+      taskTypeRecommendations.push(`Focus on ${sortedByScore[0].taskType} (current avg: ${sortedByScore[0].averageOverall})`)
+    }
+    
+    // Also recommend balanced practice
+    taskTypeRecommendations.push("Practice both Task 1 and Task 2 regularly")
+  }
+  
+  // Estimate time to target (rough calculation)
+  let estimatedWeeks = 0
+  if (totalGap > 0) {
+    // Assume 0.5 band improvement per 4 weeks of consistent practice
+    estimatedWeeks = Math.ceil((totalGap / 0.5) * 4)
+  }
+  
+  const estimatedTimeToTarget = estimatedWeeks === 0 
+    ? "You're already at or above your target!"
+    : estimatedWeeks <= 4
+    ? "2-4 weeks with consistent practice"
+    : estimatedWeeks <= 8
+    ? "4-8 weeks with consistent practice"
+    : "2-3 months with consistent practice"
+  
+  return {
+    weeklyTasksRecommended: weeklyTasks,
+    focusSkills,
+    taskTypeRecommendations,
+    estimatedTimeToTarget
+  }
+}
+
+/**
+ * Generate complete target-based recommendations
+ */
+export function generateTargetBasedRecommendations(
+  tasks: TaskDocument[],
+  criteriaBreakdown: import("@/types/reports").CriteriaBreakdown,
+  targetBand: number,
+  currentAverage: number,
+  taskTypeStats: import("@/types/reports").TaskTypeStats[]
+): import("@/types/reports").TargetBasedRecommendations {
+  const skillPriority = calculateSkillPriority(criteriaBreakdown, targetBand)
+  const repeatedSuggestions = extractRepeatedSuggestions(tasks)
+  const studyPlan = generateStudyPlan(skillPriority, targetBand, currentAverage, taskTypeStats)
+  
+  return {
+    skillPriority,
+    repeatedSuggestions,
+    studyPlan
+  }
+}
