@@ -552,7 +552,8 @@ export function extractRepeatedSuggestions(
       const suggestions = criteria[skill]?.suggestions || []
       const issues = criteria[skill]?.issues || []
       
-      [...suggestions, ...issues].forEach(text => {
+      const allFeedback = suggestions.concat(issues)
+      allFeedback.forEach(text => {
         // Normalize the text for better matching
         const normalized = text.toLowerCase().trim()
         
