@@ -1,18 +1,19 @@
 import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { ChatInterface } from "@/components/chat/chat-interface"
-import { TableOfContents } from "@/components/ui/table-of-contents"
+import { PageWithTOC } from "@/components/ui/page-with-toc"
 
 export default function ChatPage() {
   return (
     <div className="min-h-screen">
       <TopNav isSignedIn userName="Alex Chen" userEmail="alex@example.com" />
       <SecondaryNav />
-      <TableOfContents />
 
-      <div className="container mx-auto px-4 py-8">
-        <ChatInterface />
-      </div>
+      <PageWithTOC>
+        <div className="container mx-auto px-4 py-8">
+          <ChatInterface />
+        </div>
+      </PageWithTOC>
     </div>
   )
 }
