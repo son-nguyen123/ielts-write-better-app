@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { Suspense } from "react"
 import { AuthProvider } from "@/components/auth/auth-provider"
+import { FloatingChatWidget } from "@/components/chat/floating-chat-widget"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default function RootLayout({
         <AuthProvider>
           <Suspense fallback={null}>
             {children}
+            <FloatingChatWidget />
             <Toaster />
             <Analytics />
           </Suspense>
