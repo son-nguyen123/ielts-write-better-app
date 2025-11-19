@@ -8,7 +8,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Send, Bot, User } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Sparkles } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-provider"
 
 interface Message {
   role: "user" | "assistant"
@@ -21,7 +24,19 @@ interface GeminiModelOption {
   description?: string
 }
 
+interface ScoredEssay {
+  id: string
+  title: string
+  prompt: string
+  response: string
+  taskType: string
+  overallBand: number
+  feedback: any
+  updatedAt: any
+}
+
 export function ChatInterface() {
+  const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [attachTask, setAttachTask] = useState(false)
@@ -31,6 +46,10 @@ export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [modelError, setModelError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [scoredEssays, setScoredEssays] = useState<ScoredEssay[]>([])
+  const [selectedEssay, setSelectedEssay] = useState<ScoredEssay | null>(null)
+  const [isEssaysOpen, setIsEssaysOpen] = useState(false)
+  const [loadingEssays, setLoadingEssays] = useState(false)
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -57,6 +76,33 @@ export function ChatInterface() {
     fetchModels()
   }, [])
 
+  useEffect(() => {
+    const fetchScoredEssays = async () => {
+      if (!user) {
+        setScoredEssays([])
+        return
+      }
+
+      setLoadingEssays(true)
+      try {
+        const response = await fetch(`/api/essays/scored?userId=${user.uid}`)
+        if (!response.ok) {
+          throw new Error("Failed to fetch scored essays")
+        }
+
+        const data = await response.json()
+        setScoredEssays(data.essays || [])
+      } catch (error) {
+        console.error("Failed to load scored essays:", error)
+        setScoredEssays([])
+      } finally {
+        setLoadingEssays(false)
+      }
+    }
+
+    fetchScoredEssays()
+  }, [user])
+
   const handleSend = async () => {
     if (!input.trim()) return
 
@@ -74,7 +120,12 @@ export function ChatInterface() {
           tone,
           level,
           model: selectedModel || undefined,
-          attachedTask: attachTask ? { prompt: "Sample prompt", essay: "Sample essay" } : null,
+          attachedTask: selectedEssay
+            ? {
+                prompt: selectedEssay.prompt,
+                essay: selectedEssay.response,
+              }
+            : null,
         }),
       })
 
@@ -138,6 +189,17 @@ export function ChatInterface() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleQuickAction = (action: string) => {
+    if (!selectedEssay) return
+    
+    setInput(action)
+    // Automatically send the message
+    setTimeout(() => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter' })
+      handleSend()
+    }, 100)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -241,26 +303,101 @@ export function ChatInterface() {
         <div className="space-y-6">
           <Card className="rounded-2xl border-border bg-card" id="context" data-toc-title="Context">
             <CardHeader>
-              <CardTitle className="text-base">Context</CardTitle>
+              <CardTitle className="text-base">Bài viết đã chấm</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="attach-task" className="text-sm">
-                  Attach current task
-                </Label>
-                <Switch id="attach-task" checked={attachTask} onCheckedChange={setAttachTask} />
-              </div>
-              {attachTask && (
-                <Select defaultValue="task-1">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="task-1">Technology Essay</SelectItem>
-                    <SelectItem value="task-2">Climate Chart</SelectItem>
-                    <SelectItem value="task-3">Education Essay</SelectItem>
-                  </SelectContent>
-                </Select>
+              {!user ? (
+                <p className="text-sm text-muted-foreground">Đăng nhập để xem bài viết của bạn</p>
+              ) : loadingEssays ? (
+                <p className="text-sm text-muted-foreground">Đang tải...</p>
+              ) : scoredEssays.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Chưa có bài viết đã chấm điểm</p>
+              ) : (
+                <div className="space-y-3">
+                  <Collapsible open={isEssaysOpen} onOpenChange={setIsEssaysOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        <span className="text-sm">
+                          {selectedEssay ? selectedEssay.title : "Chọn bài viết"}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isEssaysOpen ? "rotate-180" : ""}`} />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 space-y-2 max-h-[300px] overflow-y-auto">
+                      {scoredEssays.map((essay) => (
+                        <div
+                          key={essay.id}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedEssay?.id === essay.id
+                              ? "bg-primary/10 border-primary"
+                              : "bg-card hover:bg-muted border-border"
+                          }`}
+                          onClick={() => {
+                            setSelectedEssay(essay)
+                            setIsEssaysOpen(false)
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{essay.title}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {essay.taskType}
+                                </Badge>
+                                <span className="text-xs font-semibold text-primary">
+                                  Band {essay.overallBand?.toFixed(1)}
+                                </span>
+                              </div>
+                            </div>
+                            {selectedEssay?.id === essay.id && (
+                              <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  {selectedEssay && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <Label className="text-sm font-medium">Yêu cầu nhanh</Label>
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start text-sm"
+                          onClick={() => handleQuickAction("Chỉ ra các lỗi sai trong bài writing này")}
+                          disabled={isLoading}
+                        >
+                          <AlertCircle className="mr-2 h-4 w-4" />
+                          Chỉ ra lỗi sai
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start text-sm"
+                          onClick={() => handleQuickAction("Cải thiện bài writing này để đạt điểm cao hơn")}
+                          disabled={isLoading}
+                        >
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Cải thiện bài viết
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start text-sm"
+                          onClick={() =>
+                            handleQuickAction("Viết một bài mẫu khác tốt hơn dựa trên đề bài này")
+                          }
+                          disabled={isLoading}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Viết bài mẫu tốt hơn
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
