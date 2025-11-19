@@ -41,36 +41,75 @@ export function TableOfContents({
       return
     }
 
-    // Auto-detect headings from the DOM
-    const headings = document.querySelectorAll('h1, h2, h3, [data-toc-title]')
-    const detectedItems: TOCItem[] = []
+    const detectHeadings = () => {
+      // Auto-detect headings from the DOM
+      const headings = document.querySelectorAll('h1, h2, h3, [data-toc-title]')
+      const detectedItems: TOCItem[] = []
 
-    headings.forEach((heading) => {
-      const title = heading.getAttribute('data-toc-title') || heading.textContent || ""
-      if (!title || title.trim() === "") return
+      headings.forEach((heading) => {
+        const title = heading.getAttribute('data-toc-title') || heading.textContent || ""
+        if (!title || title.trim() === "") return
 
-      // Skip if this heading is inside the TOC itself
-      if (heading.closest('[data-toc-container]')) return
+        // Skip if this heading is inside the TOC itself
+        if (heading.closest('[data-toc-container]')) return
 
-      let id = heading.id
-      if (!id) {
-        // Generate ID from title if not present
-        id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        heading.id = id
+        let id = heading.id
+        if (!id) {
+          // Generate ID from title if not present
+          id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+          heading.id = id
+        }
+
+        const tagName = heading.tagName.toLowerCase()
+        let level = 1
+        if (tagName === 'h2' || heading.getAttribute('data-toc-level') === '2') {
+          level = 2
+        } else if (tagName === 'h3' || heading.getAttribute('data-toc-level') === '3') {
+          level = 3
+        }
+
+        detectedItems.push({ id, title, level })
+      })
+
+      setTocItems(detectedItems)
+    }
+
+    // Initial detection
+    detectHeadings()
+
+    // Set up MutationObserver to detect when content is added/changed
+    const observer = new MutationObserver((mutations) => {
+      // Check if any mutation added nodes with headings or data-toc-title
+      const hasRelevantChanges = mutations.some((mutation) => {
+        if (mutation.addedNodes.length > 0) {
+          return Array.from(mutation.addedNodes).some((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element
+              return (
+                element.matches('h1, h2, h3, [data-toc-title]') ||
+                element.querySelector('h1, h2, h3, [data-toc-title]') !== null
+              )
+            }
+            return false
+          })
+        }
+        return false
+      })
+
+      if (hasRelevantChanges) {
+        detectHeadings()
       }
-
-      const tagName = heading.tagName.toLowerCase()
-      let level = 1
-      if (tagName === 'h2' || heading.getAttribute('data-toc-level') === '2') {
-        level = 2
-      } else if (tagName === 'h3' || heading.getAttribute('data-toc-level') === '3') {
-        level = 3
-      }
-
-      detectedItems.push({ id, title, level })
     })
 
-    setTocItems(detectedItems)
+    // Observe the entire document body for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    })
+
+    return () => {
+      observer.disconnect()
+    }
   }, [items])
 
   // Track active section based on scroll position

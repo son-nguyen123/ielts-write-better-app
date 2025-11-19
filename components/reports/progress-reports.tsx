@@ -142,47 +142,13 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
     setUserTarget(target)
   }
 
-  if (!userId) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Please sign in to view your progress reports.</p>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-destructive">{error}</p>
-        <button
-          onClick={fetchReportData}
-          className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-        >
-          Try Again
-        </button>
-      </div>
-    )
-  }
-
-  if (!reportData) {
-    return null
-  }
-
-  // Prepare data for charts
-  const overallTrendData = reportData.overallScoreTrend.map(item => ({
+  // Prepare data for charts (only if we have report data)
+  const overallTrendData = reportData ? reportData.overallScoreTrend.map(item => ({
     date: `Week ${item.week}`,
     score: item.score
-  }))
+  })) : []
 
-  const criteriaData = reportData.overallScoreTrend.map((item, index) => {
+  const criteriaData = reportData ? reportData.overallScoreTrend.map((item, index) => {
     const week = item.week
     return {
       date: `Week ${week}`,
@@ -191,7 +157,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
       "Lexical Resource": reportData.criteriaTrends.LR.find(d => d.week === week)?.score || 0,
       "Grammar & Accuracy": reportData.criteriaTrends.GRA.find(d => d.week === week)?.score || 0,
     }
-  })
+  }) : []
 
   // Custom tooltip for better context
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -215,7 +181,7 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
     return null
   }
 
-  const trendValue = reportData.overallScoreTrendValue
+  const trendValue = reportData?.overallScoreTrendValue || "+0.0"
   const isPositive = trendValue.startsWith("+")
   const isNegative = trendValue.startsWith("-")
 
@@ -226,6 +192,34 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
         <p className="text-muted-foreground">Track your improvement over time and reach your targets</p>
       </div>
 
+      {!userId ? (
+        <Card className="rounded-2xl border-border bg-card" id="sign-in-prompt" data-toc-title="Get Started">
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">Please sign in to view your progress reports.</p>
+          </CardContent>
+        </Card>
+      ) : loading ? (
+        <Card className="rounded-2xl border-border bg-card" id="loading" data-toc-title="Loading">
+          <CardContent className="py-12">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card className="rounded-2xl border-border bg-card" id="error" data-toc-title="Error">
+          <CardContent className="py-12 text-center">
+            <p className="text-destructive">{error}</p>
+            <button
+              onClick={fetchReportData}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Try Again
+            </button>
+          </CardContent>
+        </Card>
+      ) : !reportData ? null : (
+        <>
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-4 items-center" id="filters" data-toc-title="Filters">
         <div className="flex items-center gap-2">
@@ -689,6 +683,8 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           )}
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   )
 }
