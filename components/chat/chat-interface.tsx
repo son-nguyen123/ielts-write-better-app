@@ -150,14 +150,14 @@ export function ChatInterface() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">AI Writing Assistant</h1>
+        <h1 className="text-3xl font-bold mb-2" id="assistant" data-toc-title="AI Writing Assistant">AI Writing Assistant</h1>
         <p className="text-muted-foreground">Get instant help with your IELTS writing</p>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
         {/* Chat Area */}
         <div className="lg:col-span-3">
-          <Card className="rounded-2xl border-border bg-card">
+          <Card className="rounded-2xl border-border bg-card" id="conversation" data-toc-title="Conversation">
             <CardHeader>
               <CardTitle>Conversation</CardTitle>
             </CardHeader>
@@ -239,7 +239,7 @@ export function ChatInterface() {
 
         {/* Context Panel */}
         <div className="space-y-6">
-          <Card className="rounded-2xl border-border bg-card">
+          <Card className="rounded-2xl border-border bg-card" id="context" data-toc-title="Context">
             <CardHeader>
               <CardTitle className="text-base">Context</CardTitle>
             </CardHeader>
@@ -265,7 +265,7 @@ export function ChatInterface() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border bg-card">
+          <Card className="rounded-2xl border-border bg-card" id="settings" data-toc-title="Settings">
             <CardHeader>
               <CardTitle className="text-base">Settings</CardTitle>
             </CardHeader>

@@ -16,6 +16,7 @@ import { subscribeToTasks } from "@/lib/firebase-firestore"
 import { TargetSetting } from "@/components/reports/target-setting"
 import { SkillPriorityVisualization } from "@/components/reports/skill-priority-visualization"
 import { OverviewCards } from "@/components/reports/overview-cards"
+import { TableOfContents } from "@/components/ui/table-of-contents"
 import type { TaskDocument, CriterionKey } from "@/types/tasks"
 import type { ProgressReportData, UserTarget } from "@/types/reports"
 
@@ -263,11 +264,12 @@ export default function DashboardPage() {
       <div className="min-h-screen">
         <TopNav />
         <SecondaryNav />
+        <TableOfContents />
 
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.displayName || "User"}</h1>
+            <h1 className="text-3xl font-bold mb-2" id="welcome" data-toc-title="Welcome">Welcome back, {user?.displayName || "User"}</h1>
             <p className="text-muted-foreground">
               {userTarget ? (
                 <>
@@ -281,7 +283,7 @@ export default function DashboardPage() {
 
           {/* Enhanced Overview Cards */}
           {reportData && !reportLoading && reportData.totalSubmissions > 0 && (
-            <div className="mb-8">
+            <div className="mb-8" id="overview" data-toc-title="Overview">
               <OverviewCards
                 currentAverage={reportData.currentOverallAverage}
                 bestRecentScore={reportData.bestRecentScore}
@@ -297,7 +299,7 @@ export default function DashboardPage() {
 
           {/* Target Setting and Skill Priority Section */}
           {user && reportData && !reportLoading && reportData.totalSubmissions > 0 && (
-            <div className="grid lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid lg:grid-cols-3 gap-6 mb-8" id="target-setting" data-toc-title="Target Setting">
               <div className="lg:col-span-1">
                 <TargetSetting
                   userId={user.uid}
@@ -320,7 +322,7 @@ export default function DashboardPage() {
 
           {/* Key Recommendations - Eye-catching section */}
           {reportData && !reportLoading && reportData.targetBasedRecommendations && reportData.targetBasedRecommendations.repeatedSuggestions.length > 0 && (
-            <Card className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent mb-8">
+            <Card className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent mb-8" id="key-recommendations" data-toc-title="Key Recommendations">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-6 w-6 text-primary" />
@@ -365,7 +367,7 @@ export default function DashboardPage() {
 
           {/* Stats Cards - fallback when no report data */}
           {(!reportData || reportData.totalSubmissions === 0) && (
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="grid md:grid-cols-3 gap-6 mb-8" id="stats" data-toc-title="Statistics">
             <Card className="rounded-2xl border-border bg-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Latest Overall Score</CardTitle>
@@ -452,7 +454,7 @@ export default function DashboardPage() {
 
           {/* Personalized Study Plan */}
           {reportData && !reportLoading && reportData.targetBasedRecommendations && (
-            <Card className="rounded-2xl border-border bg-card mb-8">
+            <Card className="rounded-2xl border-border bg-card mb-8" id="study-plan" data-toc-title="Study Plan">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" />
@@ -521,7 +523,7 @@ export default function DashboardPage() {
           )}
 
           {/* Progress Chart */}
-          <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <div className="grid lg:grid-cols-2 gap-6 mb-8" id="progress-activity" data-toc-title="Progress & Activity">
             <Card className="rounded-2xl border-border bg-card">
               <CardHeader>
                 <CardTitle>Your Progress</CardTitle>
@@ -593,7 +595,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Actions */}
-          <Card className="rounded-2xl border-border bg-card">
+          <Card className="rounded-2xl border-border bg-card" id="quick-actions" data-toc-title="Quick Actions">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Start practicing or get help</CardDescription>
