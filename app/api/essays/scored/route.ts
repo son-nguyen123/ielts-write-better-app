@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export async function GET(req: NextRequest) {
@@ -10,12 +10,11 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: "User ID is required" }, { status: 400 })
     }
 
-    // Query for scored tasks only
+    // Query for scored tasks only (without orderBy to avoid composite index requirement)
     const tasksRef = collection(db, "users", userId, "tasks")
     const q = query(
       tasksRef,
-      where("status", "==", "scored"),
-      orderBy("updatedAt", "desc")
+      where("status", "==", "scored")
     )
     
     const snapshot = await getDocs(q)
@@ -31,6 +30,13 @@ export async function GET(req: NextRequest) {
         feedback: data.feedback,
         updatedAt: data.updatedAt,
       }
+    })
+
+    // Sort by updatedAt in memory (descending - most recent first)
+    scoredEssays.sort((a, b) => {
+      const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?.seconds * 1000 || 0
+      const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?.seconds * 1000 || 0
+      return bTime - aTime
     })
 
     return Response.json({ essays: scoredEssays })
