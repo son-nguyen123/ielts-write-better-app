@@ -8,11 +8,13 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   ResponsiveContainer,
+  Legend,
 } from "recharts"
 
 interface RadarChartProps {
   scores?: Partial<Record<CriterionKey, number>>
   target?: number
+  beforeScores?: Partial<Record<CriterionKey, number>>
   isLoading?: boolean
 }
 
@@ -25,7 +27,7 @@ const CRITERIA_FULL_NAMES: Record<CriterionKey, string> = {
   GRA: "Grammar & Accuracy"
 }
 
-export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps) {
+export function RadarChart({ scores, target = 7.5, beforeScores, isLoading }: RadarChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-[300px] w-full items-center justify-center text-sm text-muted-foreground">
@@ -48,6 +50,7 @@ export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps)
     criteria: CRITERIA_FULL_NAMES[criterion],
     current: scores?.[criterion] ?? 0,
     target,
+    before: beforeScores?.[criterion] ?? undefined,
   }))
 
   return (
@@ -64,8 +67,19 @@ export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps)
           tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
           tickCount={10}
         />
+        {beforeScores && (
+          <Radar
+            name="Before"
+            dataKey="before"
+            stroke="hsl(var(--muted-foreground))"
+            fill="hsl(var(--muted-foreground))"
+            fillOpacity={0.2}
+            strokeWidth={2}
+            strokeDasharray="3 3"
+          />
+        )}
         <Radar
-          name="Current Score"
+          name="Current"
           dataKey="current"
           stroke="hsl(var(--primary))"
           fill="hsl(var(--primary))"
@@ -73,13 +87,18 @@ export function RadarChart({ scores, target = 7.5, isLoading }: RadarChartProps)
           strokeWidth={2}
         />
         <Radar 
-          name="Target Score" 
+          name="Target" 
           dataKey="target" 
           stroke="hsl(var(--accent))" 
           fill="hsl(var(--accent))" 
           fillOpacity={0.2}
           strokeWidth={2}
           strokeDasharray="5 5"
+        />
+        <Legend 
+          wrapperStyle={{ paddingTop: "10px" }}
+          iconType="circle"
+          formatter={(value) => <span className="text-sm font-medium">{value}</span>}
         />
       </RechartsRadar>
     </ResponsiveContainer>
