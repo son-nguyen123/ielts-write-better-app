@@ -189,13 +189,13 @@ export function TableOfContents({
     <div
       data-toc-container
       className={cn(
-        "fixed top-[7.5rem] left-4 z-30 transition-all duration-300",
+        "fixed top-[7.5rem] bottom-8 left-4 z-30 transition-all duration-300 flex flex-col",
         isCollapsed ? "w-12" : "w-64",
         className
       )}
     >
-      <div className="rounded-lg border bg-card shadow-lg">
-        <div className="flex items-center justify-between p-3 border-b">
+      <div className="rounded-lg border bg-card shadow-lg flex flex-col max-h-full">
+        <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
           {!isCollapsed && (
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <Menu className="h-4 w-4" />
@@ -218,7 +218,7 @@ export function TableOfContents({
         </div>
 
         {!isCollapsed && (
-          <ScrollArea className="h-[calc(100vh-12rem)] max-h-[600px]">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="p-3 space-y-1">
               {tocItems.map((item) => (
                 <button
