@@ -32,11 +32,38 @@ export function TableOfContents({
   const [activeId, setActiveId] = useState<string>("")
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   const [tocItems, setTocItems] = useState<TOCItem[]>(items || [])
+  const [isHidden, setIsHidden] = useState(false)
   
   // Notify parent of toggle state changes
   useEffect(() => {
     onToggle?.(isCollapsed)
   }, [isCollapsed, onToggle])
+
+  // Hide TOC when footer is visible to prevent overlap
+  useEffect(() => {
+    const footer = document.querySelector('footer')
+    if (!footer) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // Hide TOC when footer starts to become visible
+          setIsHidden(entry.isIntersecting)
+        })
+      },
+      {
+        // Trigger when footer starts entering the viewport
+        rootMargin: '0px 0px -100px 0px',
+        threshold: 0
+      }
+    )
+
+    observer.observe(footer)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   // Auto-detect headings from the page if items not provided
   useEffect(() => {
@@ -191,6 +218,7 @@ export function TableOfContents({
       className={cn(
         "fixed top-[7.5rem] left-4 z-30 transition-all duration-300",
         isCollapsed ? "w-12" : "w-64",
+        isHidden && "opacity-0 pointer-events-none",
         className
       )}
     >
