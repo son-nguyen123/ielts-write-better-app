@@ -426,6 +426,43 @@ export function calculateBestRecentScore(tasks: TaskDocument[], days: number = 3
 }
 
 /**
+ * Calculate first submission criteria scores (baseline for comparison)
+ */
+export function calculateFirstSubmissionScores(tasks: TaskDocument[]): {
+  TR: number
+  CC: number
+  LR: number
+  GRA: number
+} | null {
+  // Sort tasks by creation date (oldest first)
+  const sortedTasks = [...tasks]
+    .filter(task => task.feedback && task.createdAt)
+    .sort((a, b) => {
+      if (!a.createdAt || !b.createdAt) return 0
+      return a.createdAt.toMillis() - b.createdAt.toMillis()
+    })
+  
+  if (sortedTasks.length === 0) {
+    return null
+  }
+  
+  // Get the first task with feedback
+  const firstTask = sortedTasks[0]
+  const criteria = firstTask.feedback?.criteria
+  
+  if (!criteria) {
+    return null
+  }
+  
+  return {
+    TR: criteria.TR?.score ?? 0,
+    CC: criteria.CC?.score ?? 0,
+    LR: criteria.LR?.score ?? 0,
+    GRA: criteria.GRA?.score ?? 0
+  }
+}
+
+/**
  * Calculate statistics by task type
  */
 export function calculateTaskTypeStats(tasks: TaskDocument[]): import("@/types/reports").TaskTypeStats[] {

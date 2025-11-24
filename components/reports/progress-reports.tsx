@@ -522,15 +522,10 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
           )}
 
           {/* Performance Comparison Chart */}
-          {reportData.criteriaBreakdown && (
+          {reportData.criteriaBreakdown && reportData.firstSubmissionScores && (
             <div className="mb-6" id="performance-comparison" data-toc-title="Before & After Comparison">
               <PerformanceComparisonChart
-                beforeScores={{
-                  TR: 5.5,
-                  CC: 5.0,
-                  LR: 5.0,
-                  GRA: 4.5
-                }}
+                beforeScores={reportData.firstSubmissionScores}
                 currentScores={{
                   TR: reportData.criteriaBreakdown.TR,
                   CC: reportData.criteriaBreakdown.CC,
