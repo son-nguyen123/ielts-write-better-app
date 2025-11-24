@@ -14,7 +14,8 @@ import {
   calculateBestRecentScore,
   calculateTaskTypeStats,
   getRecentSubmissions,
-  generateTargetBasedRecommendations
+  generateTargetBasedRecommendations,
+  calculateFirstSubmissionScores
 } from "@/lib/report-analytics"
 
 export const maxDuration = 60
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
     const bestRecentScore = calculateBestRecentScore(scoredTasks, dateRange)
     const taskTypeStats = calculateTaskTypeStats(scoredTasks)
     const recentSubmissions = getRecentSubmissions(scoredTasks, 10)
+    const firstSubmissionScores = calculateFirstSubmissionScores(scoredTasks)
 
     // Calculate practice time metrics
     const practiceTime = calculatePracticeTime(allTasks)
@@ -114,7 +116,8 @@ export async function POST(req: NextRequest) {
       bestRecentScore,
       totalSubmissions: scoredTasks.length,
       taskTypeStats,
-      recentSubmissions
+      recentSubmissions,
+      firstSubmissionScores
     }
     
     // Add target-based recommendations if target is provided

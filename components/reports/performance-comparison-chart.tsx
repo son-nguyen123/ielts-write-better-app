@@ -1,5 +1,6 @@
 "use client"
 
+import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts"
 
@@ -31,6 +32,22 @@ const CRITERIA_NAMES = {
   CC: "Coherence & Cohesion",
   LR: "Lexical Resource",
   GRA: "Grammatical Range & Accuracy"
+}
+
+// Short names for display
+const CRITERIA_SHORT_NAMES: Record<keyof typeof CRITERIA_NAMES, string> = {
+  TR: "Task Response",
+  CC: "Coherence & Cohesion",
+  LR: "Lexical Resource",
+  GRA: "Grammar & Accuracy"
+}
+
+// Helper to format improvement areas
+function formatImprovementAreas(improvements: Record<string, number>): string {
+  return Object.entries(improvements)
+    .filter(([_, val]) => val < 0)
+    .map(([key, val]) => `${key} (${val.toFixed(2)})`)
+    .join(', ')
 }
 
 export function PerformanceComparisonChart({ 
@@ -77,10 +94,12 @@ export function PerformanceComparisonChart({
       GRA: currentScores.GRA - beforeScores.GRA,
     }
     
+    const averageImprovement = (improvements.TR + improvements.CC + improvements.LR + improvements.GRA) / 4
     const maxImprovement = Math.max(...Object.values(improvements))
+    const minImprovement = Math.min(...Object.values(improvements))
     const maxCriterion = Object.entries(improvements).find(([_, val]) => val === maxImprovement)?.[0]
     
-    return { improvements, maxImprovement, maxCriterion }
+    return { improvements, averageImprovement, maxImprovement, minImprovement, maxCriterion }
   }
 
   const improvementInfo = calculateImprovement()
@@ -117,10 +136,44 @@ export function PerformanceComparisonChart({
     return null
   }
 
-  // Custom label renderer
+  // Custom label renderer with improvement indicators
   const renderCustomLabel = (props: any) => {
-    const { x, y, width, value } = props
+    const { x, y, width, value, dataKey } = props
     if (!showLabels || value === 0) return null
+    
+    // Show improvement delta for Current bars
+    if (dataKey === 'Current' && beforeScores) {
+      const criterionShortName = props.payload.shortName as keyof typeof beforeScores
+      const beforeValue = beforeScores[criterionShortName]
+      const improvement = value - beforeValue
+      const improvementText = improvement >= 0 ? `+${improvement.toFixed(1)}` : improvement.toFixed(1)
+      const color = improvement > 0 ? '#22c55e' : improvement < 0 ? '#ef4444' : '#9CA3AF'
+      
+      return (
+        <g>
+          <text
+            x={x + width / 2}
+            y={y - 20}
+            fill="#FFFFFF"
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight={600}
+          >
+            {value.toFixed(1)}
+          </text>
+          <text
+            x={x + width / 2}
+            y={y - 5}
+            fill={color}
+            textAnchor="middle"
+            fontSize={11}
+            fontWeight={700}
+          >
+            ({improvementText})
+          </text>
+        </g>
+      )
+    }
     
     return (
       <text
@@ -144,14 +197,44 @@ export function PerformanceComparisonChart({
         </CardTitle>
         <CardDescription className="text-gray-300">
           {beforeScores 
-            ? "Comparison of your performance before and now across all IELTS criteria"
+            ? "Comparison of your first submission vs current average performance across all IELTS criteria"
             : "Your current performance across all IELTS criteria"
           }
         </CardDescription>
-        {improvementInfo && improvementInfo.maxImprovement > 0 && (
-          <p className="text-sm text-gray-300 mt-2">
-            You have improved by <span className="font-bold text-green-400">+{improvementInfo.maxImprovement.toFixed(1)} band</span> in {improvementInfo.maxCriterion} ({CRITERIA_NAMES[improvementInfo.maxCriterion as keyof typeof CRITERIA_NAMES].split('/')[0].trim()}).
-          </p>
+        {improvementInfo && (
+          <div className="mt-3 space-y-2">
+            {improvementInfo.averageImprovement > 0 ? (
+              <p className="text-sm text-green-400 font-semibold flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Average improvement: <span className="text-lg">+{improvementInfo.averageImprovement.toFixed(2)} bands</span> across all criteria
+              </p>
+            ) : improvementInfo.averageImprovement < 0 ? (
+              <p className="text-sm text-orange-400 font-semibold flex items-center gap-2">
+                <TrendingDown className="h-4 w-4" />
+                Average change: <span className="text-lg">{improvementInfo.averageImprovement.toFixed(2)} bands</span> - keep practicing!
+              </p>
+            ) : (
+              <p className="text-sm text-gray-400 font-semibold">
+                Your scores are stable. Focus on consistent practice for improvement.
+              </p>
+            )}
+            {improvementInfo.maxImprovement > 0 && improvementInfo.maxCriterion && (
+              <p className="text-sm text-gray-300 flex items-start gap-2">
+                <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5 text-green-400" />
+                <span>
+                  Best improvement: <span className="font-bold text-green-400">+{improvementInfo.maxImprovement.toFixed(2)} bands</span> in {improvementInfo.maxCriterion} ({CRITERIA_SHORT_NAMES[improvementInfo.maxCriterion as keyof typeof CRITERIA_SHORT_NAMES]})
+                </span>
+              </p>
+            )}
+            {improvementInfo.minImprovement < 0 && (
+              <p className="text-sm text-gray-300 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-orange-400" />
+                <span>
+                  Areas needing attention: {formatImprovementAreas(improvementInfo.improvements)}
+                </span>
+              </p>
+            )}
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -207,7 +290,7 @@ export function PerformanceComparisonChart({
                 label={renderCustomLabel}
                 stroke={BORDER_COLOR}
                 strokeWidth={2}
-                name="Before (Pre-test)"
+                name="First Submission"
               />
             )}
             <Bar 
@@ -217,7 +300,7 @@ export function PerformanceComparisonChart({
               label={renderCustomLabel}
               stroke={BORDER_COLOR}
               strokeWidth={2}
-              name="Now (Current)"
+              name="Current Average"
             />
           </BarChart>
         </ResponsiveContainer>

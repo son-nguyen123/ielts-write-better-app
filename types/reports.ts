@@ -61,6 +61,13 @@ export interface ProgressReportData {
   totalSubmissions: number
   taskTypeStats: TaskTypeStats[]
   recentSubmissions: RecentSubmission[]
+  // First submission scores for baseline comparison
+  firstSubmissionScores?: {
+    TR: number
+    CC: number
+    LR: number
+    GRA: number
+  } | null
   // Target-based recommendations (optional)
   targetBasedRecommendations?: TargetBasedRecommendations
   userTarget?: UserTarget
