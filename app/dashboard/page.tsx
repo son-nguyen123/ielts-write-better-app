@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { FileText, Flame, PenLine, MessageSquare, TrendingUp, Target, Loader2, BookOpen, Lightbulb } from "lucide-react"
+import { FileText, Flame, PenLine, MessageSquare, TrendingUp, Target, Loader2, BookOpen, Lightbulb, AlertCircle } from "lucide-react"
 
 import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { RadarChart } from "@/components/dashboard/radar-chart"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -18,9 +19,17 @@ import { SkillPriorityVisualization } from "@/components/reports/skill-priority-
 import { OverviewCards } from "@/components/reports/overview-cards"
 import { PageWithTOC } from "@/components/ui/page-with-toc"
 import type { TaskDocument, CriterionKey } from "@/types/tasks"
-import type { ProgressReportData, UserTarget } from "@/types/reports"
+import type { ProgressReportData, UserTarget, RepeatedSuggestion } from "@/types/reports"
 
 const CRITERIA_ORDER: CriterionKey[] = ["TR", "CC", "LR", "GRA"]
+
+// Criteria full names for better clarity
+const CRITERIA_NAMES = {
+  TR: "Task Response",
+  CC: "Coherence & Cohesion",
+  LR: "Lexical Resource",
+  GRA: "Grammar & Accuracy"
+}
 
 const formatTimestamp = (value?: TaskDocument["updatedAt"] | TaskDocument["createdAt"]) => {
   if (!value) {
@@ -113,6 +122,9 @@ export default function DashboardPage() {
   const [reportData, setReportData] = useState<ProgressReportData | null>(null)
   const [userTarget, setUserTarget] = useState<UserTarget | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<RepeatedSuggestion | null>(null)
+  const [improvementSuggestions, setImprovementSuggestions] = useState<string | null>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -199,6 +211,39 @@ export default function DashboardPage() {
 
   function handleTargetSaved(target: UserTarget) {
     setUserTarget(target)
+  }
+
+  async function handleSuggestionClick(suggestion: RepeatedSuggestion) {
+    setSelectedSuggestion(suggestion)
+    setLoadingSuggestions(true)
+    setImprovementSuggestions(null)
+
+    try {
+      const response = await fetch("/api/reports/improvement-suggestions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          issueName: suggestion.suggestion,
+          relatedCriterion: suggestion.relatedSkill,
+          userLevel: reportData?.currentOverallAverage
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch improvement suggestions")
+      }
+
+      const data = await response.json()
+      setImprovementSuggestions(data.suggestions)
+    } catch (err) {
+      console.error("Error fetching suggestions:", err)
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred"
+      setImprovementSuggestions(`Failed to load improvement suggestions: ${errorMessage}. Please try again or contact support if the issue persists.`)
+    } finally {
+      setLoadingSuggestions(false)
+    }
   }
 
   const latestScoredTask = useMemo(() => {
@@ -352,7 +397,8 @@ export default function DashboardPage() {
                   {reportData.targetBasedRecommendations.repeatedSuggestions.slice(0, 4).map((suggestion, index) => (
                     <div 
                       key={index} 
-                      className="p-4 rounded-xl bg-card border-2 border-border hover:border-primary/50 transition-all hover:shadow-lg"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="p-4 rounded-xl bg-card border-2 border-border hover:border-primary/50 transition-all hover:shadow-lg cursor-pointer"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -365,6 +411,9 @@ export default function DashboardPage() {
                           <p className="text-sm font-medium leading-relaxed">{suggestion.suggestion}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Appeared {suggestion.count} times in your feedback
+                          </p>
+                          <p className="text-xs text-primary mt-2 font-medium">
+                            Click to see how to improve →
                           </p>
                         </div>
                       </div>
@@ -642,6 +691,36 @@ export default function DashboardPage() {
           </Card>
         </div>
       </PageWithTOC>
+
+      {/* Improvement Suggestions Dialog */}
+      <Dialog open={selectedSuggestion !== null} onOpenChange={(open) => !open && setSelectedSuggestion(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-warning" />
+              How to Improve: {selectedSuggestion?.suggestion}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedSuggestion?.relatedSkill && CRITERIA_NAMES[selectedSuggestion.relatedSkill as keyof typeof CRITERIA_NAMES] && (
+                <span>Related to: <strong>{CRITERIA_NAMES[selectedSuggestion.relatedSkill as keyof typeof CRITERIA_NAMES]}</strong></span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingSuggestions ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-3 text-muted-foreground">Generating personalized improvement tips...</span>
+            </div>
+          ) : improvementSuggestions ? (
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                {improvementSuggestions}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       </div>
     </ProtectedRoute>
   )
