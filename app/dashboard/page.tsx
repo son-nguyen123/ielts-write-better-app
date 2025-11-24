@@ -239,7 +239,8 @@ export default function DashboardPage() {
       setImprovementSuggestions(data.suggestions)
     } catch (err) {
       console.error("Error fetching suggestions:", err)
-      setImprovementSuggestions("Failed to load improvement suggestions. Please try again.")
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred"
+      setImprovementSuggestions(`Failed to load improvement suggestions: ${errorMessage}. Please try again or contact support if the issue persists.`)
     } finally {
       setLoadingSuggestions(false)
     }
@@ -700,7 +701,7 @@ export default function DashboardPage() {
               How to Improve: {selectedSuggestion?.suggestion}
             </DialogTitle>
             <DialogDescription>
-              {selectedSuggestion?.relatedSkill && (
+              {selectedSuggestion?.relatedSkill && CRITERIA_NAMES[selectedSuggestion.relatedSkill as keyof typeof CRITERIA_NAMES] && (
                 <span>Related to: <strong>{CRITERIA_NAMES[selectedSuggestion.relatedSkill as keyof typeof CRITERIA_NAMES]}</strong></span>
               )}
             </DialogDescription>
@@ -717,11 +718,7 @@ export default function DashboardPage() {
                 {improvementSuggestions}
               </div>
             </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              Failed to load suggestions. Please try again.
-            </div>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
       </div>
