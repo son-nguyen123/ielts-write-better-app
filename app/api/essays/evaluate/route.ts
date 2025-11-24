@@ -234,9 +234,27 @@ function transformLineLevelFeedback(feedbackArray: any[]): LineLevelFeedback[] {
  * This provides a basic assessment rather than failing completely
  */
 function createFallbackFeedback(text: string, taskType: string): TaskFeedback {
-  // Extract any numbers that might be scores
-  const scores = text.match(/\d+(?:\.\d+)?/g)?.map(s => parseFloat(s)).filter(s => s >= 0 && s <= 9) || []
-  const defaultScore = scores.length > 0 ? scores[0] : 6.0
+  // Extract any numbers that might be scores from band/score context
+  const scorePattern = /(?:band|score|overall)[:\s]+(\d+(?:\.\d+)?)/gi
+  const contextMatches = Array.from(text.matchAll(scorePattern))
+  const contextScores = contextMatches
+    .map(m => parseFloat(m[1]))
+    .filter(s => s >= 0 && s <= 9)
+  
+  // Fallback to any numbers between 0-9 if no context-based scores found
+  const allScores = contextScores.length > 0 
+    ? contextScores 
+    : (text.match(/\d+(?:\.\d+)?/g)?.map(s => parseFloat(s)).filter(s => s >= 0 && s <= 9) || [])
+  
+  // Use median score for more robustness, or default to 6.0
+  let defaultScore = 6.0
+  if (allScores.length > 0) {
+    allScores.sort((a, b) => a - b)
+    const mid = Math.floor(allScores.length / 2)
+    defaultScore = allScores.length % 2 === 0 
+      ? (allScores[mid - 1] + allScores[mid]) / 2 
+      : allScores[mid]
+  }
   
   return {
     overallBand: defaultScore,
