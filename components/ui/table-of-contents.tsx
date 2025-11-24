@@ -41,36 +41,59 @@ export function TableOfContents({
       return
     }
 
-    // Auto-detect headings from the DOM
-    const headings = document.querySelectorAll('h1, h2, h3, [data-toc-title]')
-    const detectedItems: TOCItem[] = []
+    const detectHeadings = () => {
+      // Auto-detect headings from the DOM
+      const headings = document.querySelectorAll('h1, h2, h3, [data-toc-title]')
+      const detectedItems: TOCItem[] = []
 
-    headings.forEach((heading) => {
-      const title = heading.getAttribute('data-toc-title') || heading.textContent || ""
-      if (!title || title.trim() === "") return
+      headings.forEach((heading) => {
+        const title = heading.getAttribute('data-toc-title') || heading.textContent || ""
+        if (!title || title.trim() === "") return
 
-      // Skip if this heading is inside the TOC itself
-      if (heading.closest('[data-toc-container]')) return
+        // Skip if this heading is inside the TOC itself
+        if (heading.closest('[data-toc-container]')) return
 
-      let id = heading.id
-      if (!id) {
-        // Generate ID from title if not present
-        id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        heading.id = id
-      }
+        let id = heading.id
+        if (!id) {
+          // Generate ID from title if not present
+          id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+          heading.id = id
+        }
 
-      const tagName = heading.tagName.toLowerCase()
-      let level = 1
-      if (tagName === 'h2' || heading.getAttribute('data-toc-level') === '2') {
-        level = 2
-      } else if (tagName === 'h3' || heading.getAttribute('data-toc-level') === '3') {
-        level = 3
-      }
+        const tagName = heading.tagName.toLowerCase()
+        let level = 1
+        if (tagName === 'h2' || heading.getAttribute('data-toc-level') === '2') {
+          level = 2
+        } else if (tagName === 'h3' || heading.getAttribute('data-toc-level') === '3') {
+          level = 3
+        }
 
-      detectedItems.push({ id, title, level })
+        detectedItems.push({ id, title, level })
+      })
+
+      setTocItems(detectedItems)
+    }
+
+    // Initial detection
+    detectHeadings()
+
+    // Re-detect after a short delay to catch dynamically rendered content
+    const timer = setTimeout(detectHeadings, 500)
+
+    // Also set up a MutationObserver to detect new headings added to the DOM
+    const observer = new MutationObserver(() => {
+      detectHeadings()
     })
 
-    setTocItems(detectedItems)
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    })
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
   }, [items])
 
   // Track active section based on scroll position
@@ -79,13 +102,29 @@ export function TableOfContents({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveId(entry.target.id)
+        // Find the entry that is intersecting and has the highest intersectionRatio
+        const intersectingEntries = entries.filter(entry => entry.isIntersecting)
+        
+        if (intersectingEntries.length > 0) {
+          // Sort by intersection ratio and position (top-most visible section wins)
+          const topEntry = intersectingEntries.sort((a, b) => {
+            // First, prioritize by intersection ratio
+            if (Math.abs(a.intersectionRatio - b.intersectionRatio) > 0.1) {
+              return b.intersectionRatio - a.intersectionRatio
+            }
+            // If similar intersection ratios, prioritize the one closer to the top
+            return a.boundingClientRect.top - b.boundingClientRect.top
+          })[0]
+          
+          if (topEntry) {
+            setActiveId(topEntry.target.id)
           }
-        })
+        }
       },
-      { rootMargin: "-20% 0px -35% 0px" }
+      { 
+        rootMargin: "-100px 0px -66% 0px",
+        threshold: [0, 0.25, 0.5, 0.75, 1]
+      }
     )
 
     tocItems.forEach((item) => {
@@ -103,6 +142,9 @@ export function TableOfContents({
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)
     if (element) {
+      // Immediately set the active state when clicking
+      setActiveId(id)
+      
       const yOffset = -120 // Offset for fixed headers (TopNav 64px + SecondaryNav ~56px)
       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
       window.scrollTo({ top: y, behavior: "smooth" })
