@@ -158,6 +158,99 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     GRA: "Grammar & Accuracy",
   }
 
+  const renderHighlightedText = (text: string, feedbackItems: LineLevelFeedback[], highlighted: LineLevelFeedback | null) => {
+    if (!feedbackItems || feedbackItems.length === 0) {
+      return text
+    }
+
+    // Sort feedback items by startIndex to process them in order
+    const sortedFeedback = [...feedbackItems]
+      .filter(item => {
+        // Validate indices
+        return item.startIndex >= 0 && 
+               item.endIndex <= text.length && 
+               item.startIndex < item.endIndex
+      })
+      .sort((a, b) => a.startIndex - b.startIndex)
+    
+    const parts: JSX.Element[] = []
+    let lastIndex = 0
+
+    sortedFeedback.forEach((feedback, index) => {
+      // Add text before this feedback
+      if (feedback.startIndex > lastIndex) {
+        parts.push(
+          <span key={`text-${index}`}>
+            {text.substring(lastIndex, feedback.startIndex)}
+          </span>
+        )
+      }
+
+      // Add the highlighted feedback
+      const categoryColors: Record<string, string> = {
+        grammar: highlighted === feedback ? "bg-red-200 dark:bg-red-900" : "bg-red-100 dark:bg-red-950/50",
+        lexical: highlighted === feedback ? "bg-yellow-200 dark:bg-yellow-900" : "bg-yellow-100 dark:bg-yellow-950/50",
+        coherence: highlighted === feedback ? "bg-blue-200 dark:bg-blue-900" : "bg-blue-100 dark:bg-blue-950/50",
+        task_response: highlighted === feedback ? "bg-purple-200 dark:bg-purple-900" : "bg-purple-100 dark:bg-purple-950/50",
+      }
+
+      const colorClass = categoryColors[feedback.category] || (highlighted === feedback ? "bg-gray-200 dark:bg-gray-900" : "bg-gray-100 dark:bg-gray-950/50")
+
+      parts.push(
+        <span
+          key={`feedback-${index}`}
+          className={`${colorClass} px-1 rounded cursor-pointer transition-colors border-b-2 ${
+            highlighted === feedback ? "border-current" : "border-transparent"
+          }`}
+          title={feedback.comment}
+        >
+          {text.substring(feedback.startIndex, feedback.endIndex)}
+        </span>
+      )
+
+      lastIndex = feedback.endIndex
+    })
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(
+        <span key="text-end">
+          {text.substring(lastIndex)}
+        </span>
+      )
+    }
+
+    return <>{parts}</>
+  }
+
+  const renderCorrectedText = (text: string, feedbackItems: LineLevelFeedback[]) => {
+    if (!feedbackItems || feedbackItems.length === 0) {
+      return text
+    }
+
+    // Sort feedback items by startIndex in reverse order to process from end to start
+    // This prevents index shifting issues
+    const sortedFeedback = [...feedbackItems]
+      .filter(item => {
+        // Only include items with suggested rewrites and valid indices
+        return item.suggestedRewrite && 
+               item.startIndex >= 0 && 
+               item.endIndex <= text.length && 
+               item.startIndex < item.endIndex
+      })
+      .sort((a, b) => b.startIndex - a.startIndex)
+    
+    let correctedText = text
+    
+    sortedFeedback.forEach((feedback) => {
+      const before = correctedText.substring(0, feedback.startIndex)
+      const after = correctedText.substring(feedback.endIndex)
+      correctedText = before + feedback.suggestedRewrite + after
+    })
+
+    return correctedText
+  }
+
   type CriterionEntry = [CriterionKey, TaskFeedback["criteria"][CriterionKey]]
 
   const criteriaEntries = useMemo<CriterionEntry[]>(() => {
@@ -339,9 +432,15 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                 </>
               ) : (
                 <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                    {task.response}
-                  </div>
+                  {task.feedback?.lineLevelFeedback && task.feedback.lineLevelFeedback.length > 0 ? (
+                    <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
+                      {renderHighlightedText(task.response || "", task.feedback.lineLevelFeedback, highlightedFeedback)}
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
+                      {task.response}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -403,16 +502,27 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                   </TabsContent>
                   
                   <TabsContent value="paragraph" className="space-y-3 mt-4">
-                    <div className="text-sm text-muted-foreground">
-                      <p className="mb-3">Based on the line-level feedback, here are key improvements to focus on:</p>
-                      <ul className="space-y-2">
-                        {task.feedback.actionItems?.map((item, index) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Corrected Version (with all suggestions applied):</h4>
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
+                            {renderCorrectedText(task.response || "", task.feedback.lineLevelFeedback)}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        <p className="mb-3 font-semibold">Key improvements to focus on:</p>
+                        <ul className="space-y-2">
+                          {task.feedback.actionItems?.map((item, index) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </TabsContent>
                 </Tabs>
