@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
 
     const gap = targetScore - currentScore
 
+    // Sanitize user inputs to prevent prompt injection
+    const sanitizedTitle = submissionTitle?.replace(/[`"'\n\r]/g, ' ').substring(0, 200) || "Untitled"
+    const sanitizedSuggestion = keySuggestion?.replace(/[`"'\n\r]/g, ' ').substring(0, 500) || ""
+
     // If already at or above target, return a congratulatory message
     if (gap <= 0) {
       return Response.json({
@@ -47,12 +51,12 @@ export async function POST(req: NextRequest) {
     const prompt = `You are an expert IELTS writing tutor analyzing a student's essay performance to help them reach their target score.
 
 **Essay Details:**
-- Title: "${submissionTitle}"
+- Title: ${sanitizedTitle}
 - Weakest Criterion: ${getCriterionFullName(weakestSkill)}
 - Current Score: ${currentScore.toFixed(1)}
 - Target Score: ${targetScore.toFixed(1)}
 - Gap to Close: +${gap.toFixed(1)} points
-${keySuggestion ? `- Identified Issue: "${keySuggestion}"` : ""}
+${sanitizedSuggestion ? `- Identified Issue: ${sanitizedSuggestion}` : ""}
 
 **Your Task:**
 Provide specific, actionable guidance to help the student improve from ${currentScore.toFixed(1)} to ${targetScore.toFixed(1)} in ${getCriterionFullName(weakestSkill)}.

@@ -41,21 +41,16 @@ export function TargetImprovementAnalysis({
   const [error, setError] = useState<string | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    if (recentSubmissions.length > 0) {
-      analyzeSubmissions()
-    }
-  }, [recentSubmissions, targetBand])
-
-  async function analyzeSubmissions() {
+  const analyzeSubmissions = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      // Analyze up to 5 most recent submissions
+      // Analyze up to 5 most recent submissions sequentially to avoid rate limiting
       const submissionsToAnalyze = recentSubmissions.slice(0, 5)
+      const results: ImprovementAnalysis[] = []
       
-      const analysisPromises = submissionsToAnalyze.map(async (submission) => {
+      for (const submission of submissionsToAnalyze) {
         const response = await fetch("/api/reports/analyze-submission-gap", {
           method: "POST",
           headers: {
@@ -75,10 +70,10 @@ export function TargetImprovementAnalysis({
           throw new Error(`Failed to analyze submission ${submission.id}`)
         }
 
-        return response.json()
-      })
+        const result = await response.json()
+        results.push(result)
+      }
 
-      const results = await Promise.all(analysisPromises)
       setAnalyses(results)
     } catch (err) {
       console.error("Error analyzing submissions:", err)
@@ -87,6 +82,13 @@ export function TargetImprovementAnalysis({
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (recentSubmissions.length > 0) {
+      analyzeSubmissions()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recentSubmissions, targetBand])
 
   const toggleExpanded = (id: string) => {
     const newExpanded = new Set(expandedIds)
