@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -15,11 +16,32 @@ import { PenLine, User, BarChart3, LogOut } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { signOutUser } from "@/lib/firebase-auth"
 import { useToast } from "@/hooks/use-toast"
+import { getUserProfile } from "@/lib/firebase-firestore"
 
 export function TopNav() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const [avatarUrl, setAvatarUrl] = useState<string>("")
+
+  useEffect(() => {
+    async function loadAvatar() {
+      if (!user) {
+        setAvatarUrl("")
+        return
+      }
+
+      try {
+        const profile = await getUserProfile(user.uid)
+        setAvatarUrl(profile?.avatarUrl || user.photoURL || "")
+      } catch (error) {
+        console.error("Error loading avatar:", error)
+        setAvatarUrl(user.photoURL || "")
+      }
+    }
+
+    loadAvatar()
+  }, [user])
 
   const handleSignOut = async () => {
     const { error } = await signOutUser()
@@ -81,7 +103,7 @@ export function TopNav() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.photoURL || undefined} />
+                      <AvatarImage src={avatarUrl || undefined} />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
                       </AvatarFallback>
