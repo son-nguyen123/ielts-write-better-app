@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 // Constants for TOC behavior configuration
 const HEADING_DETECTION_DELAY = 500 // ms to wait for dynamic content to load
 const INTERSECTION_RATIO_THRESHOLD = 0.1 // threshold for comparing intersection ratios
+const FOOTER_HIDE_OFFSET = -100 // px offset before footer to start hiding TOC
 
 interface TOCItem {
   id: string
@@ -32,11 +33,48 @@ export function TableOfContents({
   const [activeId, setActiveId] = useState<string>("")
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   const [tocItems, setTocItems] = useState<TOCItem[]>(items || [])
+  const [isHidden, setIsHidden] = useState(false)
   
   // Notify parent of toggle state changes
   useEffect(() => {
     onToggle?.(isCollapsed)
   }, [isCollapsed, onToggle])
+
+  // Hide TOC when footer is visible to prevent overlap
+  useEffect(() => {
+    // Wait for footer to be rendered in the DOM
+    const checkFooter = () => {
+      const footer = document.querySelector('footer')
+      if (!footer) {
+        // Footer not yet rendered, retry after a short delay
+        const retryTimer = setTimeout(checkFooter, 100)
+        return () => clearTimeout(retryTimer)
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            // Hide TOC when footer starts to become visible
+            setIsHidden(entry.isIntersecting)
+          })
+        },
+        {
+          // Trigger when footer starts entering the viewport
+          rootMargin: `0px 0px ${FOOTER_HIDE_OFFSET}px 0px`,
+          threshold: 0
+        }
+      )
+
+      observer.observe(footer)
+
+      return () => {
+        observer.disconnect()
+      }
+    }
+
+    const cleanup = checkFooter()
+    return cleanup
+  }, [])
 
   // Auto-detect headings from the page if items not provided
   useEffect(() => {
@@ -191,6 +229,7 @@ export function TableOfContents({
       className={cn(
         "fixed top-[7.5rem] left-4 z-30 transition-all duration-300",
         isCollapsed ? "w-12" : "w-64",
+        isHidden && "opacity-0 pointer-events-none",
         className
       )}
     >
