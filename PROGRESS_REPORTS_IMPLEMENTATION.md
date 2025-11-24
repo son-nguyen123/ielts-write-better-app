@@ -47,38 +47,31 @@ React component with:
 - Date range selector (7/30/90 days)
 - Loading and error states
 - Multiple visualizations:
-  - Overall score trend chart
   - Criteria radar chart
-  - Criteria trends line chart
   - Common issues list
   - Practice time metrics
   - Personalized feedback panel
 
 ## Features
 
-### 1. Overall Score Trend
-- Line chart showing weekly band score progression
-- Trend indicator (+/- since start)
-- Grouped by weeks for clarity
-
-### 2. Criteria Breakdown
+### 1. Criteria Breakdown
 - Radar chart for TR, CC, LR, GRA
 - Filterable by 7/30/90 days
 - Shows current vs target performance
 
-### 3. Common Issues Analysis
+### 2. Common Issues Analysis
 - Top 5 recurring writing problems
 - Trend indicators: Improving / Worsening / Stable
 - Based on issue frequency comparison between periods
 
-### 4. Personalized Feedback
+### 3. Personalized Feedback
 - Overall progress summary
 - Strengths identification
 - Weaknesses to improve
 - Actionable recommendations (3-5 items)
 - Criterion-specific advice
 
-### 5. Practice Time Metrics
+### 4. Practice Time Metrics
 - Hours practiced this week/month
 - Total tasks completed
 - Estimated from word count (20 words/min)
@@ -117,18 +110,6 @@ import { ProgressReports } from "@/components/reports/progress-reports"
 ```
 
 ## Calculations
-
-### Overall Score Trend
-1. Sort tasks by date
-2. Group into weeks (7-day buckets)
-3. Calculate average band score per week
-4. Return trend data points
-
-### Criteria Trends
-1. Similar to overall, but for each criterion
-2. Extract TR, CC, LR, GRA scores from feedback
-3. Group by weeks
-4. Calculate averages
 
 ### Common Issues
 1. Extract all issues from task feedback

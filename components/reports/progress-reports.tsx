@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { Select } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { TrendingUp, TrendingDown, AlertCircle, Loader2, Filter, ChevronRight } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { RadarChart } from "@/components/dashboard/radar-chart"
 import { useAuth } from "@/lib/firebase-auth"
 import { OverviewCards } from "./overview-cards"
@@ -185,49 +184,6 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
     return null
   }
 
-  // Prepare data for charts
-  const overallTrendData = reportData.overallScoreTrend.map(item => ({
-    date: `Week ${item.week}`,
-    score: item.score
-  }))
-
-  const criteriaData = reportData.overallScoreTrend.map((item, index) => {
-    const week = item.week
-    return {
-      date: `Week ${week}`,
-      "Task Response": reportData.criteriaTrends.TR.find(d => d.week === week)?.score || 0,
-      "Coherence & Cohesion": reportData.criteriaTrends.CC.find(d => d.week === week)?.score || 0,
-      "Lexical Resource": reportData.criteriaTrends.LR.find(d => d.week === week)?.score || 0,
-      "Grammar & Accuracy": reportData.criteriaTrends.GRA.find(d => d.week === week)?.score || 0,
-    }
-  })
-
-  // Custom tooltip for better context
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-          <p className="font-semibold mb-2">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center gap-2 text-sm">
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-muted-foreground">{entry.name}:</span>
-              <span className="font-semibold">{entry.value.toFixed(1)}</span>
-            </div>
-          ))}
-        </div>
-      )
-    }
-    return null
-  }
-
-  const trendValue = reportData.overallScoreTrendValue
-  const isPositive = trendValue.startsWith("+")
-  const isNegative = trendValue.startsWith("-")
-
   return (
     <div>
       <div className="mb-6">
@@ -321,62 +277,6 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
               )}
             </div>
           )}
-          {/* Overall Trend */}
-          <Card className="rounded-2xl border-border bg-card mb-6" id="overall-trend" data-toc-title="Overall Trend">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl">Overall Score Trend</CardTitle>
-                  <CardDescription className="text-base mt-1">Your average band score over time</CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  {isPositive ? (
-                    <TrendingUp className="h-6 w-6 text-success" />
-                  ) : isNegative ? (
-                    <TrendingDown className="h-6 w-6 text-destructive" />
-                  ) : (
-                    <TrendingUp className="h-6 w-6 text-muted-foreground" />
-                  )}
-                  <div className="text-right">
-                    <div className={`text-3xl font-bold ${isPositive ? "text-success" : isNegative ? "text-destructive" : "text-muted-foreground"}`}>
-                      {trendValue.split(" ")[0]}
-                    </div>
-                    <span className="text-sm text-muted-foreground">since start</span>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={overallTrendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
-                    tickLine={{ stroke: "hsl(var(--border))" }}
-                  />
-                  <YAxis
-                    domain={[0, 9]}
-                    ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
-                    tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
-                    tickLine={{ stroke: "hsl(var(--border))" }}
-                    label={{ value: "Band Score", angle: -90, position: "insideLeft", style: { fill: "hsl(var(--foreground))", fontSize: 14 } }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line 
-                    type="monotone" 
-                    dataKey="score" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={3} 
-                    dot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "hsl(var(--background))" }}
-                    activeDot={{ r: 7 }}
-                    name="Overall Score"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
           <div className="grid lg:grid-cols-2 gap-6 mb-6">
             {/* Criteria Radar */}
             <Card className="rounded-2xl border-border bg-card" id="criteria-breakdown" data-toc-title="Criteria Breakdown">
@@ -464,75 +364,6 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
               </CardContent>
             </Card>
           </div>
-
-
-
-          {/* Detailed Criteria Trends */}
-          {criteriaData.length > 0 && (
-            <Card className="rounded-2xl border-border bg-card mb-6" id="criteria-trends" data-toc-title="Criteria Trends">
-              <CardHeader>
-                <CardTitle className="text-2xl">Criteria Trends</CardTitle>
-                <CardDescription className="text-base">Track individual criteria performance over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={criteriaData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
-                      tickLine={{ stroke: "hsl(var(--border))" }}
-                    />
-                    <YAxis
-                      domain={[0, 9]}
-                      ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
-                      tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
-                      tickLine={{ stroke: "hsl(var(--border))" }}
-                      label={{ value: "Band Score", angle: -90, position: "insideLeft", style: { fill: "hsl(var(--foreground))", fontSize: 14 } }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: "20px" }}
-                      iconType="line"
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Task Response" 
-                      stroke="hsl(var(--chart-1))" 
-                      strokeWidth={3} 
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Coherence & Cohesion" 
-                      stroke="hsl(var(--chart-2))" 
-                      strokeWidth={3} 
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Lexical Resource" 
-                      stroke="hsl(var(--chart-3))" 
-                      strokeWidth={3} 
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Grammar & Accuracy" 
-                      stroke="hsl(var(--chart-4))" 
-                      strokeWidth={3} 
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Performance Comparison Chart */}
           {reportData.criteriaBreakdown && reportData.firstSubmissionScores && (
