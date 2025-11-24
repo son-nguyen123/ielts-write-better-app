@@ -164,7 +164,14 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     }
 
     // Sort feedback items by startIndex to process them in order
-    const sortedFeedback = [...feedbackItems].sort((a, b) => a.startIndex - b.startIndex)
+    const sortedFeedback = [...feedbackItems]
+      .filter(item => {
+        // Validate indices
+        return item.startIndex >= 0 && 
+               item.endIndex <= text.length && 
+               item.startIndex < item.endIndex
+      })
+      .sort((a, b) => a.startIndex - b.startIndex)
     
     const parts: JSX.Element[] = []
     let lastIndex = 0
@@ -180,17 +187,19 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       }
 
       // Add the highlighted feedback
-      const categoryColors = {
+      const categoryColors: Record<string, string> = {
         grammar: highlighted === feedback ? "bg-red-200 dark:bg-red-900" : "bg-red-100 dark:bg-red-950/50",
         lexical: highlighted === feedback ? "bg-yellow-200 dark:bg-yellow-900" : "bg-yellow-100 dark:bg-yellow-950/50",
         coherence: highlighted === feedback ? "bg-blue-200 dark:bg-blue-900" : "bg-blue-100 dark:bg-blue-950/50",
         task_response: highlighted === feedback ? "bg-purple-200 dark:bg-purple-900" : "bg-purple-100 dark:bg-purple-950/50",
       }
 
+      const colorClass = categoryColors[feedback.category] || (highlighted === feedback ? "bg-gray-200 dark:bg-gray-900" : "bg-gray-100 dark:bg-gray-950/50")
+
       parts.push(
         <span
           key={`feedback-${index}`}
-          className={`${categoryColors[feedback.category]} px-1 rounded cursor-pointer transition-colors border-b-2 ${
+          className={`${colorClass} px-1 rounded cursor-pointer transition-colors border-b-2 ${
             highlighted === feedback ? "border-current" : "border-transparent"
           }`}
           title={feedback.comment}
@@ -222,7 +231,13 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     // Sort feedback items by startIndex in reverse order to process from end to start
     // This prevents index shifting issues
     const sortedFeedback = [...feedbackItems]
-      .filter(item => item.suggestedRewrite) // Only include items with suggested rewrites
+      .filter(item => {
+        // Only include items with suggested rewrites and valid indices
+        return item.suggestedRewrite && 
+               item.startIndex >= 0 && 
+               item.endIndex <= text.length && 
+               item.startIndex < item.endIndex
+      })
       .sort((a, b) => b.startIndex - a.startIndex)
     
     let correctedText = text

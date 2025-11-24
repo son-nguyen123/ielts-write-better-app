@@ -73,7 +73,7 @@ Return your response as a JSON object with this exact structure:
   ]
 }
 
-IMPORTANT: The line_level_feedback array MUST NOT be empty. Always provide at least several specific error corrections or improvement suggestions with exact character positions.`
+IMPORTANT: Provide line-level feedback for any errors or areas for improvement found in the essay. If the essay is exceptionally well-written with no significant errors, the line_level_feedback array may be empty, but this should be rare.`
 
     const userPrompt = `PROMPT (This is what the essay MUST respond to):
 ${promptText || "No specific prompt provided"}
