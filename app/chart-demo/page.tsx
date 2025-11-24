@@ -11,14 +11,14 @@ export default function ChartDemoPage() {
       <PageWithTOC>
         <div className="container mx-auto px-4 py-8">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2">IELTS Performance Comparison Chart Demo</h1>
+            <h1 className="text-3xl font-bold mb-2" id="chart-demo" data-toc-title="Performance Comparison Demo">IELTS Performance Comparison Chart Demo</h1>
             <p className="text-muted-foreground">
               This demonstrates the new colorful grouped bar chart showing before/after comparison across IELTS criteria
             </p>
           </div>
 
           {/* Example 1: With Before Scores (showing improvement) */}
-          <div className="mb-8">
+          <div className="mb-8" id="example-1" data-toc-title="Example 1: Improvement">
             <h2 className="text-xl font-semibold mb-4">Example 1: Showing Improvement (Before vs Now)</h2>
             <PerformanceComparisonChart
               beforeScores={{
@@ -37,7 +37,7 @@ export default function ChartDemoPage() {
           </div>
 
           {/* Example 2: Current scores only */}
-          <div className="mb-8">
+          <div className="mb-8" id="example-2" data-toc-title="Example 2: Current Only">
             <h2 className="text-xl font-semibold mb-4">Example 2: Current Performance Only</h2>
             <PerformanceComparisonChart
               currentScores={{
@@ -50,7 +50,7 @@ export default function ChartDemoPage() {
           </div>
 
           {/* Example 3: Lower band scores showing different improvement patterns */}
-          <div className="mb-8">
+          <div className="mb-8" id="example-3" data-toc-title="Example 3: Different Patterns">
             <h2 className="text-xl font-semibold mb-4">Example 3: Different Improvement Patterns</h2>
             <PerformanceComparisonChart
               beforeScores={{
