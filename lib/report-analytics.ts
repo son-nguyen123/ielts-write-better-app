@@ -454,12 +454,17 @@ export function calculateFirstSubmissionScores(tasks: TaskDocument[]): {
     return null
   }
   
-  return {
-    TR: criteria.TR?.score ?? 0,
-    CC: criteria.CC?.score ?? 0,
-    LR: criteria.LR?.score ?? 0,
-    GRA: criteria.GRA?.score ?? 0
+  // Check if all criteria have scores - return null if any are missing
+  const TR = criteria.TR?.score
+  const CC = criteria.CC?.score
+  const LR = criteria.LR?.score
+  const GRA = criteria.GRA?.score
+  
+  if (TR === undefined || CC === undefined || LR === undefined || GRA === undefined) {
+    return null
   }
+  
+  return { TR, CC, LR, GRA }
 }
 
 /**

@@ -1,5 +1,6 @@
 "use client"
 
+import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts"
 
@@ -31,6 +32,22 @@ const CRITERIA_NAMES = {
   CC: "Coherence & Cohesion",
   LR: "Lexical Resource",
   GRA: "Grammatical Range & Accuracy"
+}
+
+// Short names for display
+const CRITERIA_SHORT_NAMES: Record<keyof typeof CRITERIA_NAMES, string> = {
+  TR: "Task Response",
+  CC: "Coherence & Cohesion",
+  LR: "Lexical Resource",
+  GRA: "Grammar & Accuracy"
+}
+
+// Helper to format improvement areas
+function formatImprovementAreas(improvements: Record<string, number>): string {
+  return Object.entries(improvements)
+    .filter(([_, val]) => val < 0)
+    .map(([key, val]) => `${key} (${val.toFixed(2)})`)
+    .join(', ')
 }
 
 export function PerformanceComparisonChart({ 
@@ -187,12 +204,14 @@ export function PerformanceComparisonChart({
         {improvementInfo && (
           <div className="mt-3 space-y-2">
             {improvementInfo.averageImprovement > 0 ? (
-              <p className="text-sm text-green-400 font-semibold">
-                📈 Average improvement: <span className="text-lg">+{improvementInfo.averageImprovement.toFixed(2)} bands</span> across all criteria
+              <p className="text-sm text-green-400 font-semibold flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Average improvement: <span className="text-lg">+{improvementInfo.averageImprovement.toFixed(2)} bands</span> across all criteria
               </p>
             ) : improvementInfo.averageImprovement < 0 ? (
-              <p className="text-sm text-orange-400 font-semibold">
-                ⚠️ Average change: <span className="text-lg">{improvementInfo.averageImprovement.toFixed(2)} bands</span> - keep practicing!
+              <p className="text-sm text-orange-400 font-semibold flex items-center gap-2">
+                <TrendingDown className="h-4 w-4" />
+                Average change: <span className="text-lg">{improvementInfo.averageImprovement.toFixed(2)} bands</span> - keep practicing!
               </p>
             ) : (
               <p className="text-sm text-gray-400 font-semibold">
@@ -200,16 +219,19 @@ export function PerformanceComparisonChart({
               </p>
             )}
             {improvementInfo.maxImprovement > 0 && improvementInfo.maxCriterion && (
-              <p className="text-sm text-gray-300">
-                🎯 Best improvement: <span className="font-bold text-green-400">+{improvementInfo.maxImprovement.toFixed(2)} bands</span> in {improvementInfo.maxCriterion} ({CRITERIA_NAMES[improvementInfo.maxCriterion as keyof typeof CRITERIA_NAMES].split('/')[0].trim()})
+              <p className="text-sm text-gray-300 flex items-start gap-2">
+                <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5 text-green-400" />
+                <span>
+                  Best improvement: <span className="font-bold text-green-400">+{improvementInfo.maxImprovement.toFixed(2)} bands</span> in {improvementInfo.maxCriterion} ({CRITERIA_SHORT_NAMES[improvementInfo.maxCriterion as keyof typeof CRITERIA_SHORT_NAMES]})
+                </span>
               </p>
             )}
             {improvementInfo.minImprovement < 0 && (
-              <p className="text-sm text-gray-300">
-                💡 Areas needing attention: {Object.entries(improvementInfo.improvements)
-                  .filter(([_, val]) => val < 0)
-                  .map(([key, val]) => `${key} (${val.toFixed(2)})`)
-                  .join(', ')}
+              <p className="text-sm text-gray-300 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-orange-400" />
+                <span>
+                  Areas needing attention: {formatImprovementAreas(improvementInfo.improvements)}
+                </span>
               </p>
             )}
           </div>
