@@ -15,6 +15,7 @@ import { PenLine, User, BarChart3, LogOut } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { signOutUser } from "@/lib/firebase-auth"
 import { useToast } from "@/hooks/use-toast"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function TopNav() {
   const { user, loading } = useAuth()
@@ -68,6 +69,7 @@ export function TopNav() {
         </div>
 
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           {loading ? (
             <div className="h-8 w-20 bg-muted animate-pulse rounded" />
           ) : user ? (

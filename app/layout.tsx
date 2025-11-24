@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { Suspense } from "react"
 import { AuthProvider } from "@/components/auth/auth-provider"
+import { ThemeProvider } from "@/components/theme-provider"
 import { FloatingChatWidget } from "@/components/chat/floating-chat-widget"
 import "./globals.css"
 
@@ -21,16 +22,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-        <AuthProvider>
-          <Suspense fallback={null}>
-            {children}
-            <FloatingChatWidget />
-            <Toaster />
-            <Analytics />
-          </Suspense>
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <Suspense fallback={null}>
+              {children}
+              <FloatingChatWidget />
+              <Toaster />
+              <Analytics />
+            </Suspense>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
