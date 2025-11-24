@@ -99,9 +99,12 @@ export function TableOfContents({
         return Array.from(mutation.addedNodes).some(node => {
           if (node.nodeType !== Node.ELEMENT_NODE) return false
           const element = node as Element
+          const tagName = element.tagName?.toLowerCase()
+          // Quick check using tagName first, then fallback to attribute/querySelector
           return (
-            element.matches('h1, h2, h3, [data-toc-title]') ||
-            element.querySelector('h1, h2, h3, [data-toc-title]')
+            tagName === 'h1' || tagName === 'h2' || tagName === 'h3' ||
+            element.hasAttribute('data-toc-title') ||
+            element.querySelector('h1, h2, h3, [data-toc-title]') !== null
           )
         })
       })
