@@ -16,6 +16,7 @@ import { SkillPriorityVisualization } from "./skill-priority-visualization"
 import { TargetRecommendations } from "./target-recommendations"
 import { RecentSubmissionsTable } from "./recent-submissions-table"
 import { PerformanceComparisonChart } from "./performance-comparison-chart"
+import { Markdown } from "@/components/ui/markdown"
 import type { ProgressReportData, UserTarget, CommonIssue } from "@/types/reports"
 
 // Criteria full names for better clarity
@@ -684,9 +685,10 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
             </div>
           ) : improvementSuggestions ? (
             <div className="prose prose-sm max-w-none dark:prose-invert">
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                {improvementSuggestions}
-              </div>
+              <Markdown 
+                content={improvementSuggestions}
+                className="text-sm leading-relaxed"
+              />
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">

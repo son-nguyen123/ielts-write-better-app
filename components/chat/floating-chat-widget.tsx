@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Sparkles, MessageCircle, X, Minimize2 } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { cn } from "@/lib/utils"
+import { Markdown } from "@/components/ui/markdown"
 
 interface Message {
   role: "user" | "assistant"
@@ -344,7 +345,11 @@ export function FloatingChatWidget() {
                           message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
                         }`}
                       >
-                        <p className="leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        {message.role === "user" ? (
+                          <p className="leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        ) : (
+                          <Markdown content={message.content} className="leading-relaxed" />
+                        )}
                       </div>
                       {message.role === "user" && (
                         <div className="rounded-full bg-accent/10 p-1.5 h-6 w-6 flex items-center justify-center flex-shrink-0">

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
+import { Markdown } from "@/components/ui/markdown"
 
 interface Message {
   role: "user" | "assistant"
@@ -326,7 +327,11 @@ export function ChatInterface() {
                           message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
                         }`}
                       >
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        {message.role === "user" ? (
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        ) : (
+                          <Markdown content={message.content} className="text-sm leading-relaxed" />
+                        )}
                       </div>
                       {message.role === "user" && (
                         <div className="rounded-full bg-accent/10 p-2 h-8 w-8 flex items-center justify-center flex-shrink-0">
