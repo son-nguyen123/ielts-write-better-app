@@ -6,6 +6,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+// Constants for TOC behavior configuration
+const HEADING_DETECTION_DELAY = 500 // ms to wait for dynamic content to load
+const INTERSECTION_RATIO_THRESHOLD = 0.1 // threshold for comparing intersection ratios
+
 interface TOCItem {
   id: string
   title: string
@@ -78,11 +82,33 @@ export function TableOfContents({
     detectHeadings()
 
     // Re-detect after a short delay to catch dynamically rendered content
-    const timer = setTimeout(detectHeadings, 500)
+    const timer = setTimeout(detectHeadings, HEADING_DETECTION_DELAY)
 
     // Also set up a MutationObserver to detect new headings added to the DOM
-    const observer = new MutationObserver(() => {
-      detectHeadings()
+    // Debounce the detection to avoid excessive re-renders
+    let detectionTimeout: NodeJS.Timeout | null = null
+    const debouncedDetection = () => {
+      if (detectionTimeout) clearTimeout(detectionTimeout)
+      detectionTimeout = setTimeout(detectHeadings, 100)
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      // Only trigger if heading-related elements might have been added
+      const hasRelevantChanges = mutations.some(mutation => {
+        // Check if any added nodes are headings or contain headings
+        return Array.from(mutation.addedNodes).some(node => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return false
+          const element = node as Element
+          return (
+            element.matches('h1, h2, h3, [data-toc-title]') ||
+            element.querySelector('h1, h2, h3, [data-toc-title]')
+          )
+        })
+      })
+      
+      if (hasRelevantChanges) {
+        debouncedDetection()
+      }
     })
 
     observer.observe(document.body, {
@@ -92,6 +118,7 @@ export function TableOfContents({
 
     return () => {
       clearTimeout(timer)
+      if (detectionTimeout) clearTimeout(detectionTimeout)
       observer.disconnect()
     }
   }, [items])
@@ -109,7 +136,7 @@ export function TableOfContents({
           // Sort by intersection ratio and position (top-most visible section wins)
           const topEntry = intersectingEntries.sort((a, b) => {
             // First, prioritize by intersection ratio
-            if (Math.abs(a.intersectionRatio - b.intersectionRatio) > 0.1) {
+            if (Math.abs(a.intersectionRatio - b.intersectionRatio) > INTERSECTION_RATIO_THRESHOLD) {
               return b.intersectionRatio - a.intersectionRatio
             }
             // If similar intersection ratios, prioritize the one closer to the top
