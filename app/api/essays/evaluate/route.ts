@@ -31,8 +31,19 @@ IMPORTANT: The Task Response (TR) score should heavily consider:
 2. Whether all parts of the task are answered
 3. Relevance to the topic throughout the essay
 
+CRITICAL: You MUST provide line-level feedback for the essay. Analyze the text thoroughly and identify:
+- Grammar errors (verb tense, subject-verb agreement, articles, etc.)
+- Lexical issues (word choice, collocations, inappropriate vocabulary)
+- Coherence problems (unclear references, poor transitions, logical flow issues)
+- Task response issues (off-topic sentences, irrelevant information)
+
+For each error found, provide:
+- Exact start and end character indices in the essay text
+- Category of the error
+- Clear explanation of the problem
+- A suggested correction/rewrite
+
 Provide detailed, actionable feedback with specific examples from the text.
-Also provide line-level feedback for specific errors in the essay (grammar, lexical, coherence, task response).
 
 Return your response as a JSON object with this exact structure:
 {
@@ -56,11 +67,13 @@ Return your response as a JSON object with this exact structure:
       "start_index": 0,
       "end_index": 54,
       "category": "grammar" | "lexical" | "coherence" | "task_response",
-      "comment": "Check verb tense consistency.",
-      "suggested_rewrite": "Other regions like America and Oceania had a smaller amount."
+      "comment": "Explain the specific error or issue here.",
+      "suggested_rewrite": "Provide the corrected version here."
     }
   ]
-}`
+}
+
+IMPORTANT: The line_level_feedback array MUST NOT be empty. Always provide at least several specific error corrections or improvement suggestions with exact character positions.`
 
     const userPrompt = `PROMPT (This is what the essay MUST respond to):
 ${promptText || "No specific prompt provided"}
@@ -111,25 +124,21 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       parsedFeedback = JSON.parse(text)
     } catch (parseError) {
       console.error("[evaluate] Failed to parse AI response as JSON:", parseError)
-      // Fallback to basic feedback if parsing fails
-      parsedFeedback = {
-        overall_band: 6.0,
-        summary: "Overall assessment of the essay.",
-        criteria: generateDefaultCriteria(),
-        action_plan: [
-          "Practice writing with clearer structure",
-          "Expand vocabulary range",
-          "Review grammar rules"
-        ],
-        line_level_feedback: []
-      }
+      console.error("[evaluate] Raw AI response that failed to parse:", text)
+      throw new Error("Không thể phân tích kết quả chấm điểm từ AI. Vui lòng thử lại sau.")
+    }
+    
+    // Validate that required fields are present
+    if (!parsedFeedback.overall_band || !parsedFeedback.criteria) {
+      console.error("[evaluate] AI response missing required fields:", parsedFeedback)
+      throw new Error("Phản hồi từ AI không đầy đủ. Vui lòng thử lại sau.")
     }
 
     // Transform API response to match our internal format
     const feedback: TaskFeedback = {
-      overallBand: parsedFeedback.overall_band || 6.0,
+      overallBand: parsedFeedback.overall_band,
       summary: parsedFeedback.summary || "Overall assessment of the essay.",
-      criteria: transformCriteria(parsedFeedback.criteria || {}),
+      criteria: transformCriteria(parsedFeedback.criteria),
       actionItems: parsedFeedback.action_plan || [],
       lineLevelFeedback: transformLineLevelFeedback(parsedFeedback.line_level_feedback || [])
     }
@@ -167,47 +176,18 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
   }
 }
 
-function generateDefaultCriteria() {
-  return {
-    TR: {
-      score: 6.0,
-      strengths: ["Addresses the main topic"],
-      areas_for_improvement: ["Could develop ideas more fully"],
-      suggestions: ["Expand on main points with more detail"],
-      examples: []
-    },
-    CC: {
-      score: 6.0,
-      strengths: ["Clear paragraph structure"],
-      areas_for_improvement: ["Could improve transitions"],
-      suggestions: ["Use more linking words"],
-      examples: []
-    },
-    LR: {
-      score: 6.0,
-      strengths: ["Appropriate vocabulary used"],
-      areas_for_improvement: ["Limited range of vocabulary"],
-      suggestions: ["Use more varied vocabulary"],
-      examples: []
-    },
-    GRA: {
-      score: 6.0,
-      strengths: ["Basic grammar structures used correctly"],
-      areas_for_improvement: ["Some grammatical errors present"],
-      suggestions: ["Review complex sentence structures"],
-      examples: []
-    }
-  }
-}
-
 function transformCriteria(criteria: any) {
   const result: any = {}
   const criteriaKeys = ["TR", "CC", "LR", "GRA"]
   
   for (const key of criteriaKeys) {
-    const criterionData = criteria[key] || {}
+    const criterionData = criteria[key]
+    if (!criterionData || typeof criterionData.score !== 'number') {
+      console.error(`[evaluate] Missing or invalid criterion data for ${key}:`, criterionData)
+      throw new Error(`Dữ liệu tiêu chí ${key} không hợp lệ từ AI`)
+    }
     result[key] = {
-      score: criterionData.score || 6.0,
+      score: criterionData.score,
       strengths: criterionData.strengths || [],
       issues: criterionData.areas_for_improvement || criterionData.issues || [],
       suggestions: criterionData.suggestions || [],
