@@ -2,6 +2,7 @@ import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { ProgressReports } from "@/components/reports/progress-reports"
 import { PageWithTOC } from "@/components/ui/page-with-toc"
+import { Footer } from "@/components/home/footer"
 
 export default function ReportsPage() {
   return (
@@ -13,6 +14,9 @@ export default function ReportsPage() {
           <ProgressReports />
         </div>
       </PageWithTOC>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }

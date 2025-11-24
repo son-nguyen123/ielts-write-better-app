@@ -1,6 +1,7 @@
 import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { GrammarChecker } from "@/components/practice/grammar-checker"
+import { Footer } from "@/components/home/footer"
 
 export default function GrammarPage() {
   return (
@@ -11,6 +12,9 @@ export default function GrammarPage() {
       <div className="container mx-auto px-4 py-8">
         <GrammarChecker />
       </div>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
