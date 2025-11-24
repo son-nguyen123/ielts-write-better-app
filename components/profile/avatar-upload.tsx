@@ -37,25 +37,26 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarChang
     if (!file) return
 
     setIsUploading(true)
+    let uploadedAvatarUrl = ""
 
     try {
-      // Upload the new avatar
-      const newAvatarUrl = await uploadAvatar(userId, file)
+      // Upload the new avatar first
+      uploadedAvatarUrl = await uploadAvatar(userId, file)
 
-      // Delete old avatar if it exists
+      // Update user profile with new avatar URL
+      await updateUserProfile(userId, { avatarUrl: uploadedAvatarUrl })
+
+      // Only delete old avatar after successful profile update
       if (currentAvatarUrl) {
         await deleteAvatar(currentAvatarUrl)
       }
 
-      // Update user profile with new avatar URL
-      await updateUserProfile(userId, { avatarUrl: newAvatarUrl })
-
       // Update local state
-      setAvatarUrl(newAvatarUrl)
+      setAvatarUrl(uploadedAvatarUrl)
 
       // Notify parent component
       if (onAvatarChange) {
-        onAvatarChange(newAvatarUrl)
+        onAvatarChange(uploadedAvatarUrl)
       }
 
       toast({
@@ -64,6 +65,12 @@ export function AvatarUpload({ userId, currentAvatarUrl, userName, onAvatarChang
       })
     } catch (error: any) {
       console.error("Error uploading avatar:", error)
+      
+      // Cleanup: delete uploaded avatar if profile update failed
+      if (uploadedAvatarUrl) {
+        await deleteAvatar(uploadedAvatarUrl)
+      }
+      
       toast({
         title: "Upload failed",
         description: error.message || "Failed to upload avatar. Please try again.",
