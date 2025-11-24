@@ -18,6 +18,7 @@ import { TargetSetting } from "@/components/reports/target-setting"
 import { SkillPriorityVisualization } from "@/components/reports/skill-priority-visualization"
 import { OverviewCards } from "@/components/reports/overview-cards"
 import { PageWithTOC } from "@/components/ui/page-with-toc"
+import { Footer } from "@/components/home/footer"
 import type { TaskDocument, CriterionKey } from "@/types/tasks"
 import type { ProgressReportData, UserTarget, RepeatedSuggestion } from "@/types/reports"
 
@@ -721,6 +722,9 @@ export default function DashboardPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      
+      {/* Footer */}
+      <Footer />
       </div>
     </ProtectedRoute>
   )

@@ -2,6 +2,7 @@ import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { ChatInterface } from "@/components/chat/chat-interface"
 import { PageWithTOC } from "@/components/ui/page-with-toc"
+import { Footer } from "@/components/home/footer"
 
 export default function ChatPage() {
   return (
@@ -13,6 +14,9 @@ export default function ChatPage() {
           <ChatInterface />
         </div>
       </PageWithTOC>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }

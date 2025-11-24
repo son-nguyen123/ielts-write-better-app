@@ -2,6 +2,7 @@ import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { TasksTable } from "@/components/tasks/tasks-table"
 import { PageWithTOC } from "@/components/ui/page-with-toc"
+import { Footer } from "@/components/home/footer"
 
 export default function TasksPage() {
   return (
@@ -13,6 +14,9 @@ export default function TasksPage() {
           <TasksTable />
         </div>
       </PageWithTOC>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
