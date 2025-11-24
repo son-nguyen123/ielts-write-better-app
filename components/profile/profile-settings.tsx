@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,16 +17,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useAuth } from "@/components/auth/auth-provider"
+import { AvatarUpload } from "./avatar-upload"
+import { getUserProfile, updateUserProfile } from "@/lib/firebase-firestore"
 
 export function ProfileSettings() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [formData, setFormData] = useState({
-    name: "Alex Chen",
-    email: "alex@example.com",
+    name: "",
+    email: "",
+    avatarUrl: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -42,21 +48,95 @@ export function ProfileSettings() {
 
   const [hasChanges, setHasChanges] = useState(false)
 
+  // Load user profile data
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user) return
+
+      try {
+        const profile = await getUserProfile(user.uid)
+        if (profile) {
+          setFormData((prev) => ({
+            ...prev,
+            name: user.displayName || profile.displayName || "",
+            email: user.email || "",
+            avatarUrl: profile.avatarUrl || "",
+            targetBand: profile.targetBand?.toString() || "7.5",
+            focusTR: profile.focusAreas?.includes("TR") ?? true,
+            focusCC: profile.focusAreas?.includes("CC") ?? false,
+            focusLR: profile.focusAreas?.includes("LR") ?? true,
+            focusGRA: profile.focusAreas?.includes("GRA") ?? false,
+            tone: profile.preferences?.tone || "neutral",
+            level: profile.preferences?.level || "B2",
+            language: profile.preferences?.language || "en",
+          }))
+        } else {
+          // Set defaults from user
+          setFormData((prev) => ({
+            ...prev,
+            name: user.displayName || "",
+            email: user.email || "",
+          }))
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load profile data.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [user, toast])
+
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     setHasChanges(true)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!user) return
+
     setIsSaving(true)
-    setTimeout(() => {
-      setIsSaving(false)
+    try {
+      // Prepare focus areas
+      const focusAreas = []
+      if (formData.focusTR) focusAreas.push("TR")
+      if (formData.focusCC) focusAreas.push("CC")
+      if (formData.focusLR) focusAreas.push("LR")
+      if (formData.focusGRA) focusAreas.push("GRA")
+
+      // Update user profile in Firestore
+      await updateUserProfile(user.uid, {
+        displayName: formData.name,
+        targetBand: parseFloat(formData.targetBand),
+        focusAreas,
+        preferences: {
+          tone: formData.tone,
+          level: formData.level,
+          language: formData.language,
+        },
+      })
+
       setHasChanges(false)
       toast({
         title: "Profile updated",
         description: "Your settings have been saved successfully.",
       })
-    }, 1000)
+    } catch (error) {
+      console.error("Error saving profile:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save profile. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleDeleteAccount = () => {
@@ -74,6 +154,26 @@ export function ProfileSettings() {
     }, 2000)
   }
 
+  const handleAvatarChange = (newAvatarUrl: string) => {
+    setFormData((prev) => ({ ...prev, avatarUrl: newAvatarUrl }))
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">Please sign in to view your profile.</p>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -89,6 +189,16 @@ export function ProfileSettings() {
             <CardDescription>Update your account information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Avatar Upload */}
+            <div className="pb-4 border-b border-border">
+              <AvatarUpload
+                userId={user.uid}
+                currentAvatarUrl={formData.avatarUrl}
+                userName={formData.name}
+                onAvatarChange={handleAvatarChange}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input

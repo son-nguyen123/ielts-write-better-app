@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await createUserProfile(user.uid, {
             email: user.email,
             displayName: user.displayName || "",
+            avatarUrl: user.photoURL || "",
             targetBand: 7.0,
             focusAreas: ["TR", "CC", "LR", "GRA"],
             preferences: {
