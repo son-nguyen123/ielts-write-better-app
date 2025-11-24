@@ -50,11 +50,12 @@ export function Markdown({ content, className = "" }: MarkdownProps) {
     ),
     // Style code blocks
     code: ({ children, className }) => {
-      const isInline = !className
-      return isInline ? (
-        <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
-      ) : (
+      // Check if it's a code block (has language- prefix) vs inline code
+      const isCodeBlock = className?.startsWith('language-')
+      return isCodeBlock ? (
         <code className="block bg-muted p-3 rounded-lg text-sm font-mono overflow-x-auto my-2">{children}</code>
+      ) : (
+        <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
       )
     },
     // Style blockquotes
