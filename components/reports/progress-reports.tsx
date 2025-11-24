@@ -16,6 +16,8 @@ import { SkillPriorityVisualization } from "./skill-priority-visualization"
 import { TargetRecommendations } from "./target-recommendations"
 import { RecentSubmissionsTable } from "./recent-submissions-table"
 import { PerformanceComparisonChart } from "./performance-comparison-chart"
+import { GapToTargetTable } from "./gap-to-target-table"
+import { TargetImprovementAnalysis } from "./target-improvement-analysis"
 import { Markdown } from "@/components/ui/markdown"
 import type { ProgressReportData, UserTarget, CommonIssue } from "@/types/reports"
 
@@ -288,23 +290,34 @@ export function ProgressReports({ userId: propUserId }: ProgressReportsProps = {
 
           {/* Target Setting and Skill Priority */}
           {userId && (
-            <div className="grid lg:grid-cols-3 gap-6 mb-6" id="target-skill-priority" data-toc-title="Target & Skills">
-              <div className="lg:col-span-1">
-                <TargetSetting
-                  userId={userId}
-                  onTargetSaved={handleTargetSaved}
-                  currentTarget={userTarget}
-                />
-              </div>
-              
-              {userTarget && reportData.targetBasedRecommendations && (
-                <div className="lg:col-span-2">
-                  <SkillPriorityVisualization
-                    skillPriority={reportData.targetBasedRecommendations.skillPriority}
-                    currentAverage={reportData.currentOverallAverage}
-                    targetBand={userTarget.targetOverallBand}
+            <div className="space-y-6 mb-6" id="target-skill-priority" data-toc-title="Target & Skills">
+              <div className="grid lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                  <TargetSetting
+                    userId={userId}
+                    onTargetSaved={handleTargetSaved}
+                    currentTarget={userTarget}
                   />
                 </div>
+                
+                {userTarget && reportData.targetBasedRecommendations && (
+                  <div className="lg:col-span-2">
+                    <GapToTargetTable
+                      currentAverage={reportData.currentOverallAverage}
+                      targetBand={userTarget.targetOverallBand}
+                      skillPriority={reportData.targetBasedRecommendations.skillPriority}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Target Improvement Analysis - Recent Submissions */}
+              {userTarget && reportData.recentSubmissions && reportData.recentSubmissions.length > 0 && (
+                <TargetImprovementAnalysis
+                  userId={userId}
+                  targetBand={userTarget.targetOverallBand}
+                  recentSubmissions={reportData.recentSubmissions}
+                />
               )}
             </div>
           )}
