@@ -2,6 +2,7 @@ import { TopNav } from "@/components/navigation/top-nav"
 import { SecondaryNav } from "@/components/navigation/secondary-nav"
 import { PerformanceComparisonChart } from "@/components/reports/performance-comparison-chart"
 import { PageWithTOC } from "@/components/ui/page-with-toc"
+import { Footer } from "@/components/home/footer"
 
 export default function ChartDemoPage() {
   return (
@@ -69,6 +70,7 @@ export default function ChartDemoPage() {
           </div>
         </div>
       </PageWithTOC>
+      <Footer />
     </div>
   )
 }
