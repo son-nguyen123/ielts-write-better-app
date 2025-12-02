@@ -839,7 +839,7 @@ Output: { analysis, recommendations }
 
 ---
 
-**Ngày tạo báo cáo:** $(date)
+**Ngày tạo báo cáo:** 02/12/2025
 
 **Phiên bản:** 1.0
 
