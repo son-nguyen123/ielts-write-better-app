@@ -283,13 +283,18 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
     // Helper function to check if feedback is irrelevant
     const isIrrelevant = (feedback: LineLevelFeedback) => {
-      return feedback.comment && (
-        feedback.comment.includes("N/A") ||
-        feedback.comment.toLowerCase().includes("irrelevant to the prompt") ||
-        feedback.comment.toLowerCase().includes("irrelevant to prompt") ||
-        feedback.comment.toLowerCase().includes("should be removed") ||
-        feedback.comment.toLowerCase().includes("does not address the prompt")
-      )
+      if (!feedback.comment) return false
+      
+      const commentLower = feedback.comment.toLowerCase()
+      const irrelevanceKeywords = [
+        'n/a',
+        'irrelevant to the prompt',
+        'irrelevant to prompt',
+        'should be removed',
+        'does not address the prompt'
+      ]
+      
+      return irrelevanceKeywords.some(keyword => commentLower.includes(keyword))
     }
 
     // Sort feedback items by startIndex in reverse order to process from end to start
