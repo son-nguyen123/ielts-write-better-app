@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, RefreshCw, Edit } from "lucide-react"
+import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, RefreshCw, Edit, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/auth-provider"
 import { getTask, addRevisionToTask } from "@/lib/firebase-firestore"
@@ -14,6 +14,11 @@ import type { CriterionKey, TaskDocument, TaskFeedback, LineLevelFeedback } from
 import { EmptyState } from "@/components/ui/empty-state"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 interface TaskDetailProps {
   taskId: string
@@ -31,6 +36,8 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const [editedResponse, setEditedResponse] = useState("")
   const [isRevaluating, setIsRevaluating] = useState(false)
   const [highlightedFeedback, setHighlightedFeedback] = useState<LineLevelFeedback | null>(null)
+  const [improvementRequests, setImprovementRequests] = useState<Record<string, any>>({})
+  const [loadingImprovements, setLoadingImprovements] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     let isMounted = true
@@ -127,6 +134,52 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       })
     } finally {
       setIsRevaluating(false)
+    }
+  }
+
+  const handleRequestImprovement = async (feedbackItem: LineLevelFeedback, revisionId: string, response: string) => {
+    const key = `${revisionId}-${feedbackItem.startIndex}-${feedbackItem.endIndex}`
+    
+    setLoadingImprovements(prev => ({ ...prev, [key]: true }))
+    
+    try {
+      const sentence = response.substring(feedbackItem.startIndex, feedbackItem.endIndex)
+      
+      const res = await fetch("/api/essays/improve-sentence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sentence,
+          context: task?.prompt,
+          category: feedbackItem.category,
+          currentIssue: feedbackItem.comment,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to get improvement suggestions")
+      }
+
+      setImprovementRequests(prev => ({ 
+        ...prev, 
+        [key]: data.improvement 
+      }))
+
+      toast({
+        title: "Đề xuất cải thiện đã sẵn sàng",
+        description: "Đã tạo đề xuất sửa lỗi cho câu này.",
+      })
+    } catch (error: any) {
+      console.error("[v0] Failed to get improvement:", error)
+      toast({
+        title: "Không thể tạo đề xuất",
+        description: error.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingImprovements(prev => ({ ...prev, [key]: false }))
     }
   }
 
@@ -541,28 +594,167 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                   No revisions have been recorded for this task yet.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {task.revisions.map((revision, index) => (
-                    <div
-                      key={revision.id}
-                      className="p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">Revision {task.revisions!.length - index}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {revision.createdAt && typeof revision.createdAt.toDate === 'function'
-                              ? format(revision.createdAt.toDate(), "MMM d, yyyy 'at' h:mm a")
-                              : "Recent"}
-                          </span>
+                <div className="space-y-4">
+                  {task.revisions.map((revision, index) => {
+                    const revisionNumber = task.revisions!.length - index
+                    const hasErrors = revision.feedback?.lineLevelFeedback && revision.feedback.lineLevelFeedback.length > 0
+                    
+                    return (
+                      <Collapsible key={revision.id}>
+                        <div className="p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">Revision {revisionNumber}</Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {revision.createdAt && typeof revision.createdAt.toDate === 'function'
+                                  ? format(revision.createdAt.toDate(), "MMM d, yyyy 'at' h:mm a")
+                                  : "Recent"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="default" className="text-sm">
+                                Band {revision.overallBand.toFixed(1)}
+                              </Badge>
+                              {hasErrors && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <AlertCircle className="h-4 w-4 mr-1 text-warning" />
+                                    {revision.feedback.lineLevelFeedback!.length} lỗi
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{revision.summary}</p>
+                          
+                          {hasErrors && (
+                            <CollapsibleContent className="mt-3">
+                              <div className="space-y-2 pl-2 border-l-2 border-muted">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Các lỗi được phát hiện:</p>
+                                {revision.feedback!.lineLevelFeedback!.map((feedback, fbIndex) => {
+                                  const key = `${revision.id}-${feedback.startIndex}-${feedback.endIndex}`
+                                  const improvement = improvementRequests[key]
+                                  const isLoading = loadingImprovements[key]
+                                  const excerpt = task.response?.substring(feedback.startIndex, feedback.endIndex) || ""
+                                  
+                                  const categoryColors = {
+                                    grammar: "border-red-500 bg-red-50 dark:bg-red-950/30",
+                                    lexical: "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30",
+                                    coherence: "border-blue-500 bg-blue-50 dark:bg-blue-950/30",
+                                    task_response: "border-purple-500 bg-purple-50 dark:bg-purple-950/30",
+                                  }
+                                  
+                                  const categoryLabels = {
+                                    grammar: "Ngữ pháp",
+                                    lexical: "Từ vựng",
+                                    coherence: "Liên kết",
+                                    task_response: "Phù hợp đề bài",
+                                  }
+                                  
+                                  return (
+                                    <div
+                                      key={fbIndex}
+                                      className={`p-3 rounded-lg border-l-4 ${categoryColors[feedback.category]} space-y-2`}
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <Badge variant="outline" className="text-xs">
+                                              {categoryLabels[feedback.category]}
+                                            </Badge>
+                                          </div>
+                                          <p className="text-sm font-mono text-muted-foreground mb-2">
+                                            "{excerpt}"
+                                          </p>
+                                          <p className="text-sm mb-2">{feedback.comment}</p>
+                                          
+                                          {!improvement && !feedback.suggestedRewrite && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => handleRequestImprovement(feedback, revision.id, task.response || "")}
+                                              disabled={isLoading}
+                                              className="mt-2"
+                                            >
+                                              {isLoading ? (
+                                                <>
+                                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                                  Đang tạo đề xuất...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Sparkles className="h-3 w-3 mr-1" />
+                                                  Request Improve
+                                                </>
+                                              )}
+                                            </Button>
+                                          )}
+                                          
+                                          {(feedback.suggestedRewrite || improvement) && (
+                                            <div className="mt-2 p-3 bg-background rounded space-y-2">
+                                              <p className="text-xs font-semibold text-success mb-1">
+                                                <Sparkles className="h-3 w-3 inline mr-1" />
+                                                Đề xuất cải thiện:
+                                              </p>
+                                              <p className="text-sm font-mono text-success">
+                                                "{improvement?.improvedSentence || feedback.suggestedRewrite}"
+                                              </p>
+                                              
+                                              {improvement && (
+                                                <>
+                                                  <div className="pt-2 border-t border-border">
+                                                    <p className="text-xs font-semibold mb-1">Giải thích:</p>
+                                                    <p className="text-xs text-muted-foreground">{improvement.explanation}</p>
+                                                  </div>
+                                                  
+                                                  {improvement.grammarIssues?.length > 0 && (
+                                                    <div className="pt-2">
+                                                      <p className="text-xs font-semibold mb-1">Lỗi ngữ pháp:</p>
+                                                      <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+                                                        {improvement.grammarIssues.map((issue: string, i: number) => (
+                                                          <li key={i}>{issue}</li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+                                                  
+                                                  {improvement.spellingIssues?.length > 0 && (
+                                                    <div className="pt-2">
+                                                      <p className="text-xs font-semibold mb-1">Lỗi chính tả:</p>
+                                                      <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+                                                        {improvement.spellingIssues.map((issue: string, i: number) => (
+                                                          <li key={i}>{issue}</li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+                                                  
+                                                  {improvement.styleImprovements?.length > 0 && (
+                                                    <div className="pt-2">
+                                                      <p className="text-xs font-semibold mb-1">Cải thiện phong cách:</p>
+                                                      <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+                                                        {improvement.styleImprovements.map((issue: string, i: number) => (
+                                                          <li key={i}>{issue}</li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+                                                </>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </CollapsibleContent>
+                          )}
                         </div>
-                        <Badge variant="default" className="text-sm">
-                          Band {revision.overallBand.toFixed(1)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{revision.summary}</p>
-                    </div>
-                  ))}
+                      </Collapsible>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
