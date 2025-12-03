@@ -281,27 +281,55 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       return text
     }
 
-    // Sort feedback items by startIndex in reverse order to process from end to start
-    // This prevents index shifting issues
-    const sortedFeedback = [...feedbackItems]
-      .filter(item => {
-        // Only include items with suggested rewrites and valid indices
-        return item.suggestedRewrite && 
-               item.startIndex >= 0 && 
-               item.endIndex <= text.length && 
-               item.startIndex < item.endIndex
-      })
-      .sort((a, b) => b.startIndex - a.startIndex)
-    
-    let correctedText = text
-    
-    sortedFeedback.forEach((feedback) => {
-      const before = correctedText.substring(0, feedback.startIndex)
-      const after = correctedText.substring(feedback.endIndex)
-      correctedText = before + feedback.suggestedRewrite + after
-    })
+    // Helper function to check if feedback is irrelevant
+    const isIrrelevant = (feedback: LineLevelFeedback) => {
+      return feedback.comment && (
+        feedback.comment.includes("N/A") ||
+        feedback.comment.toLowerCase().includes("irrelevant to the prompt") ||
+        feedback.comment.toLowerCase().includes("irrelevant to prompt") ||
+        feedback.comment.toLowerCase().includes("should be removed") ||
+        feedback.comment.toLowerCase().includes("does not address the prompt")
+      )
+    }
 
-    return correctedText
+    // Sort all feedback items by startIndex to process them in order
+    const allSegments = [...feedbackItems]
+      .filter(item => 
+        item.startIndex >= 0 && 
+        item.endIndex <= text.length && 
+        item.startIndex < item.endIndex
+      )
+      .sort((a, b) => a.startIndex - b.startIndex)
+    
+    let result = ""
+    let lastIndex = 0
+    
+    allSegments.forEach((feedback) => {
+      // Add text before this segment
+      if (feedback.startIndex > lastIndex) {
+        result += text.substring(lastIndex, feedback.startIndex)
+      }
+      
+      // Check if this segment is irrelevant
+      if (isIrrelevant(feedback)) {
+        // Skip this segment entirely (remove it from the improved version)
+      } else if (feedback.suggestedRewrite) {
+        // Replace with suggested rewrite
+        result += feedback.suggestedRewrite
+      } else {
+        // Keep original text
+        result += text.substring(feedback.startIndex, feedback.endIndex)
+      }
+      
+      lastIndex = feedback.endIndex
+    })
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      result += text.substring(lastIndex)
+    }
+    
+    return result
   }
 
   type CriterionEntry = [CriterionKey, TaskFeedback["criteria"][CriterionKey]]
