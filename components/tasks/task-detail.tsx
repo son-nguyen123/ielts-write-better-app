@@ -292,44 +292,33 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       )
     }
 
-    // Sort all feedback items by startIndex to process them in order
-    const allSegments = [...feedbackItems]
-      .filter(item => 
-        item.startIndex >= 0 && 
-        item.endIndex <= text.length && 
-        item.startIndex < item.endIndex
-      )
-      .sort((a, b) => a.startIndex - b.startIndex)
+    // Sort feedback items by startIndex in reverse order to process from end to start
+    // This prevents index shifting issues
+    const sortedFeedback = [...feedbackItems]
+      .filter(item => {
+        return item.startIndex >= 0 && 
+               item.endIndex <= text.length && 
+               item.startIndex < item.endIndex
+      })
+      .sort((a, b) => b.startIndex - a.startIndex)
     
-    let result = ""
-    let lastIndex = 0
+    let correctedText = text
     
-    allSegments.forEach((feedback) => {
-      // Add text before this segment
-      if (feedback.startIndex > lastIndex) {
-        result += text.substring(lastIndex, feedback.startIndex)
-      }
+    sortedFeedback.forEach((feedback) => {
+      const before = correctedText.substring(0, feedback.startIndex)
+      const after = correctedText.substring(feedback.endIndex)
       
-      // Check if this segment is irrelevant
       if (isIrrelevant(feedback)) {
-        // Skip this segment entirely (remove it from the improved version)
+        // Remove this segment entirely (skip it in the improved version)
+        correctedText = before + after
       } else if (feedback.suggestedRewrite) {
         // Replace with suggested rewrite
-        result += feedback.suggestedRewrite
-      } else {
-        // Keep original text
-        result += text.substring(feedback.startIndex, feedback.endIndex)
+        correctedText = before + feedback.suggestedRewrite + after
       }
-      
-      lastIndex = feedback.endIndex
+      // else: keep the original text (do nothing)
     })
-    
-    // Add remaining text
-    if (lastIndex < text.length) {
-      result += text.substring(lastIndex)
-    }
-    
-    return result
+
+    return correctedText
   }
 
   type CriterionEntry = [CriterionKey, TaskFeedback["criteria"][CriterionKey]]
