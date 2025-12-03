@@ -281,13 +281,27 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       return text
     }
 
+    // Helper function to check if feedback is irrelevant
+    const isIrrelevant = (feedback: LineLevelFeedback) => {
+      if (!feedback.comment) return false
+      
+      const commentLower = feedback.comment.toLowerCase()
+      const irrelevanceKeywords = [
+        'n/a',
+        'irrelevant to the prompt',
+        'irrelevant to prompt',
+        'should be removed',
+        'does not address the prompt'
+      ]
+      
+      return irrelevanceKeywords.some(keyword => commentLower.includes(keyword))
+    }
+
     // Sort feedback items by startIndex in reverse order to process from end to start
     // This prevents index shifting issues
     const sortedFeedback = [...feedbackItems]
       .filter(item => {
-        // Only include items with suggested rewrites and valid indices
-        return item.suggestedRewrite && 
-               item.startIndex >= 0 && 
+        return item.startIndex >= 0 && 
                item.endIndex <= text.length && 
                item.startIndex < item.endIndex
       })
@@ -298,7 +312,15 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     sortedFeedback.forEach((feedback) => {
       const before = correctedText.substring(0, feedback.startIndex)
       const after = correctedText.substring(feedback.endIndex)
-      correctedText = before + feedback.suggestedRewrite + after
+      
+      if (isIrrelevant(feedback)) {
+        // Remove this segment entirely (skip it in the improved version)
+        correctedText = before + after
+      } else if (feedback.suggestedRewrite) {
+        // Replace with suggested rewrite
+        correctedText = before + feedback.suggestedRewrite + after
+      }
+      // else: keep the original text (do nothing)
     })
 
     return correctedText
