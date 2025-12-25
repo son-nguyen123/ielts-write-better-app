@@ -113,7 +113,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       
       if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
         const quotaError = new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
-        ;(quotaError as any).status = 429
+        ;(quotaError as Error & { status?: number }).status = 429
         throw quotaError
       }
       
@@ -182,7 +182,6 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       error?.response?.status === 429 ||
       errorString.includes("resource_exhausted") ||
       errorString.includes("too many requests") ||
-      errorString.includes("quota limit") ||
       errorString.includes("quota") ||
       (errorString.includes("rate limit") && !errorString.includes("unlimited"))
     
