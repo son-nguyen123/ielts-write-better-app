@@ -6,14 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, RefreshCw, Edit } from "lucide-react"
+import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, RefreshCw, Edit, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useGeminiModels } from "@/hooks/use-gemini-models"
 import { useAuth } from "@/components/auth/auth-provider"
-import { getTask, addRevisionToTask } from "@/lib/firebase-firestore"
+import { getTask, addRevisionToTask, updateRevisionInTask } from "@/lib/firebase-firestore"
 import type { CriterionKey, TaskDocument, TaskFeedback, LineLevelFeedback } from "@/types/tasks"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format } from "date-fns"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 interface TaskDetailProps {
   taskId: string
@@ -31,6 +39,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const [editedResponse, setEditedResponse] = useState("")
   const [isRevaluating, setIsRevaluating] = useState(false)
   const [highlightedFeedback, setHighlightedFeedback] = useState<LineLevelFeedback | null>(null)
+  const [improvementRequests, setImprovementRequests] = useState<Record<string, any>>({})
+  const [loadingImprovements, setLoadingImprovements] = useState<Record<string, boolean>>({})
+  const [loadingImprovedEssays, setLoadingImprovedEssays] = useState<Record<string, boolean>>({})
+  const { modelOptions, selectedModel, setSelectedModel, modelError } = useGeminiModels()
 
   useEffect(() => {
     let isMounted = true
@@ -91,6 +103,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
           taskType: task.taskType,
           promptText: task.prompt,
           userId: user.uid,
+          model: selectedModel || undefined,
           promptId: task.promptId,
         }),
       })
@@ -127,6 +140,102 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       })
     } finally {
       setIsRevaluating(false)
+    }
+  }
+
+  const handleRequestImprovement = async (feedbackItem: LineLevelFeedback, revisionId: string, response: string) => {
+    const key = `${revisionId}-${feedbackItem.startIndex}-${feedbackItem.endIndex}`
+    
+    setLoadingImprovements(prev => ({ ...prev, [key]: true }))
+    
+    try {
+      const sentence = response.substring(feedbackItem.startIndex, feedbackItem.endIndex)
+      
+      const res = await fetch("/api/essays/improve-sentence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sentence,
+          context: task?.prompt,
+          category: feedbackItem.category,
+          currentIssue: feedbackItem.comment,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to get improvement suggestions")
+      }
+
+      setImprovementRequests(prev => ({ 
+        ...prev, 
+        [key]: data.improvement 
+      }))
+
+      toast({
+        title: "Đề xuất cải thiện đã sẵn sàng",
+        description: "Đã tạo đề xuất sửa lỗi cho câu này.",
+      })
+    } catch (error: any) {
+      console.error("[v0] Failed to get improvement:", error)
+      toast({
+        title: "Không thể tạo đề xuất",
+        description: error.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingImprovements(prev => ({ ...prev, [key]: false }))
+    }
+  }
+
+  const handleGenerateImprovedEssay = async (revisionId: string, feedback: TaskFeedback) => {
+    if (!user || !task) return
+    
+    setLoadingImprovedEssays(prev => ({ ...prev, [revisionId]: true }))
+    
+    try {
+      const res = await fetch("/api/essays/generate-improved-essay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalEssay: task.response,
+          feedback: feedback,
+          prompt: task.prompt,
+          taskType: task.taskType,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data?.improvedEssay) {
+        throw new Error(data?.error || "Failed to generate improved essay")
+      }
+
+      // Update the revision with the improved essay
+      await updateRevisionInTask(user.uid, taskId, revisionId, {
+        improvedEssay: data.improvedEssay,
+        improvementExplanation: data.explanation,
+      })
+
+      // Refresh task data
+      const updatedTask = await getTask(user.uid, taskId)
+      setTask(updatedTask as TaskDocument)
+
+      toast({
+        title: "Bài mẫu đã sẵn sàng",
+        description: "Đã tạo bài viết cải thiện dựa trên phản hồi.",
+      })
+    } catch (error: unknown) {
+      console.error("[v0] Failed to generate improved essay:", error)
+      const errorMessage = error instanceof Error ? error.message : "Vui lòng thử lại sau."
+      toast({
+        title: "Không thể tạo bài mẫu",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingImprovedEssays(prev => ({ ...prev, [revisionId]: false }))
     }
   }
 
@@ -228,13 +337,27 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       return text
     }
 
+    // Helper function to check if feedback is irrelevant
+    const isIrrelevant = (feedback: LineLevelFeedback) => {
+      if (!feedback.comment) return false
+      
+      const commentLower = feedback.comment.toLowerCase()
+      const irrelevanceKeywords = [
+        'n/a',
+        'irrelevant to the prompt',
+        'irrelevant to prompt',
+        'should be removed',
+        'does not address the prompt'
+      ]
+      
+      return irrelevanceKeywords.some(keyword => commentLower.includes(keyword))
+    }
+
     // Sort feedback items by startIndex in reverse order to process from end to start
     // This prevents index shifting issues
     const sortedFeedback = [...feedbackItems]
       .filter(item => {
-        // Only include items with suggested rewrites and valid indices
-        return item.suggestedRewrite && 
-               item.startIndex >= 0 && 
+        return item.startIndex >= 0 && 
                item.endIndex <= text.length && 
                item.startIndex < item.endIndex
       })
@@ -245,7 +368,15 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     sortedFeedback.forEach((feedback) => {
       const before = correctedText.substring(0, feedback.startIndex)
       const after = correctedText.substring(feedback.endIndex)
-      correctedText = before + feedback.suggestedRewrite + after
+      
+      if (isIrrelevant(feedback)) {
+        // Remove this segment entirely (skip it in the improved version)
+        correctedText = before + after
+      } else if (feedback.suggestedRewrite) {
+        // Replace with suggested rewrite
+        correctedText = before + feedback.suggestedRewrite + after
+      }
+      // else: keep the original text (do nothing)
     })
 
     return correctedText
@@ -401,6 +532,22 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     onChange={(e) => setEditedResponse(e.target.value)}
                     className="min-h-[300px] font-mono text-sm"
                   />
+                  <div className="space-y-2">
+                    <Label className="text-sm">Gemini Model for Re-scoring</Label>
+                    <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelOptions.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={modelError ?? "Select a model"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modelOptions.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleRevaluate}
@@ -541,28 +688,239 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                   No revisions have been recorded for this task yet.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {task.revisions.map((revision, index) => (
-                    <div
-                      key={revision.id}
-                      className="p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">Revision {task.revisions!.length - index}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {revision.createdAt && typeof revision.createdAt.toDate === 'function'
-                              ? format(revision.createdAt.toDate(), "MMM d, yyyy 'at' h:mm a")
-                              : "Recent"}
-                          </span>
+                <div className="space-y-4">
+                  {task.revisions.map((revision, index) => {
+                    const revisionNumber = task.revisions!.length - index
+                    const hasErrors = revision.feedback?.lineLevelFeedback && revision.feedback.lineLevelFeedback.length > 0
+                    
+                    return (
+                      <Collapsible key={revision.id}>
+                        <div className="p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">Revision {revisionNumber}</Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {revision.createdAt && typeof revision.createdAt.toDate === 'function'
+                                  ? format(revision.createdAt.toDate(), "MMM d, yyyy 'at' h:mm a")
+                                  : "Recent"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="default" className="text-sm">
+                                Band {revision.overallBand.toFixed(1)}
+                              </Badge>
+                              {hasErrors && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <AlertCircle className="h-4 w-4 mr-1 text-warning" />
+                                    {revision.feedback.lineLevelFeedback!.length} lỗi
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{revision.summary}</p>
+                          
+                          {/* Improved Essay Section */}
+                          {revision.feedback && (
+                            <div className="mt-3">
+                              {!revision.improvedEssay ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleGenerateImprovedEssay(revision.id, revision.feedback!)}
+                                  disabled={loadingImprovedEssays[revision.id]}
+                                  className="w-full"
+                                >
+                                  {loadingImprovedEssays[revision.id] ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Đang tạo bài mẫu cải thiện...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="h-4 w-4 mr-2" />
+                                      Tạo bài mẫu cải thiện
+                                    </>
+                                  )}
+                                </Button>
+                              ) : (
+                                <Collapsible>
+                                  <div className="space-y-2">
+                                    <CollapsibleTrigger asChild>
+                                      <Button variant="outline" size="sm" className="w-full">
+                                        <Sparkles className="h-4 w-4 mr-2 text-success" />
+                                        Xem bài mẫu cải thiện
+                                      </Button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="mt-3">
+                                      <div className="p-4 rounded-lg bg-success/5 border border-success/20 space-y-3">
+                                        <div className="flex items-start justify-between">
+                                          <p className="text-xs font-semibold text-success mb-2">
+                                            <Sparkles className="h-3 w-3 inline mr-1" />
+                                            Bài viết đã cải thiện
+                                          </p>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            aria-label="Sao chép bài mẫu cải thiện"
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(revision.improvedEssay || "")
+                                              toast({
+                                                title: "Đã sao chép",
+                                                description: "Bài mẫu đã được sao chép vào clipboard.",
+                                              })
+                                            }}
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                        <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground">
+                                          {revision.improvedEssay}
+                                        </div>
+                                        {revision.improvementExplanation && (
+                                          <div className="pt-3 border-t border-success/20">
+                                            <p className="text-xs font-semibold mb-1">Giải thích cải thiện:</p>
+                                            <p className="text-xs text-muted-foreground">{revision.improvementExplanation}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              )}
+                            </div>
+                          )}
+                          
+                          {hasErrors && (
+                            <CollapsibleContent className="mt-3">
+                              <div className="space-y-2 pl-2 border-l-2 border-muted">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Các lỗi được phát hiện:</p>
+                                {revision.feedback!.lineLevelFeedback!.map((feedback, fbIndex) => {
+                                  const key = `${revision.id}-${feedback.startIndex}-${feedback.endIndex}`
+                                  const improvement = improvementRequests[key]
+                                  const isLoading = loadingImprovements[key]
+                                  const excerpt = task.response?.substring(feedback.startIndex, feedback.endIndex) || ""
+                                  
+                                  const categoryColors = {
+                                    grammar: "border-red-500 bg-red-50 dark:bg-red-950/30",
+                                    lexical: "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30",
+                                    coherence: "border-blue-500 bg-blue-50 dark:bg-blue-950/30",
+                                    task_response: "border-purple-500 bg-purple-50 dark:bg-purple-950/30",
+                                  }
+                                  
+                                  const categoryLabels = {
+                                    grammar: "Ngữ pháp",
+                                    lexical: "Từ vựng",
+                                    coherence: "Liên kết",
+                                    task_response: "Phù hợp đề bài",
+                                  }
+                                  
+                                  return (
+                                    <div
+                                      key={fbIndex}
+                                      className={`p-3 rounded-lg border-l-4 ${categoryColors[feedback.category]} space-y-2`}
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <Badge variant="outline" className="text-xs">
+                                              {categoryLabels[feedback.category]}
+                                            </Badge>
+                                          </div>
+                                          <p className="text-sm font-mono text-muted-foreground mb-2">
+                                            "{excerpt}"
+                                          </p>
+                                          <p className="text-sm mb-2">{feedback.comment}</p>
+                                          
+                                          {!improvement && !feedback.suggestedRewrite && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => handleRequestImprovement(feedback, revision.id, task.response || "")}
+                                              disabled={isLoading}
+                                              className="mt-2"
+                                            >
+                                              {isLoading ? (
+                                                <>
+                                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                                  Đang tạo đề xuất...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Sparkles className="h-3 w-3 mr-1" />
+                                                  Request Improve
+                                                </>
+                                              )}
+                                            </Button>
+                                          )}
+                                          
+                                          {(feedback.suggestedRewrite || improvement) && (
+                                            <div className="mt-2 p-3 bg-background rounded space-y-2">
+                                              <p className="text-xs font-semibold text-success mb-1">
+                                                <Sparkles className="h-3 w-3 inline mr-1" />
+                                                Đề xuất cải thiện:
+                                              </p>
+                                              <p className="text-sm font-mono text-success">
+                                                "{improvement?.improvedSentence || feedback.suggestedRewrite}"
+                                              </p>
+                                              
+                                              {improvement && (
+                                                <>
+                                                  <div className="pt-2 border-t border-border">
+                                                    <p className="text-xs font-semibold mb-1">Giải thích:</p>
+                                                    <p className="text-xs text-muted-foreground">{improvement.explanation}</p>
+                                                  </div>
+                                                  
+                                                  {improvement.grammarIssues?.length > 0 && (
+                                                    <div className="pt-2">
+                                                      <p className="text-xs font-semibold mb-1">Lỗi ngữ pháp:</p>
+                                                      <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+                                                        {improvement.grammarIssues.map((issue: string, i: number) => (
+                                                          <li key={i}>{issue}</li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+                                                  
+                                                  {improvement.spellingIssues?.length > 0 && (
+                                                    <div className="pt-2">
+                                                      <p className="text-xs font-semibold mb-1">Lỗi chính tả:</p>
+                                                      <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+                                                        {improvement.spellingIssues.map((issue: string, i: number) => (
+                                                          <li key={i}>{issue}</li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+                                                  
+                                                  {improvement.styleImprovements?.length > 0 && (
+                                                    <div className="pt-2">
+                                                      <p className="text-xs font-semibold mb-1">Cải thiện phong cách:</p>
+                                                      <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+                                                        {improvement.styleImprovements.map((issue: string, i: number) => (
+                                                          <li key={i}>{issue}</li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+                                                </>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </CollapsibleContent>
+                          )}
                         </div>
-                        <Badge variant="default" className="text-sm">
-                          Band {revision.overallBand.toFixed(1)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{revision.summary}</p>
-                    </div>
-                  ))}
+                      </Collapsible>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>

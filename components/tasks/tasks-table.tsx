@@ -36,6 +36,7 @@ const formatTimestamp = (value?: TaskDocument["updatedAt"]) => {
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
+      timeZone: "UTC",
     }).format(date)
   } catch (error) {
     console.error("[v0] Failed to format timestamp:", error)

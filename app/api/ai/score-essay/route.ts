@@ -1,19 +1,21 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { ERROR_MESSAGES } from "@/lib/error-messages"
 
 export const maxDuration = 60
+const QUOTA_ERROR_PATTERN = /(resource_exhausted|quota exceeded|quota_exceeded|quota limit|api quota)/i
 
 export async function POST(req: Request) {
   try {
-    const { essay, taskType, prompt } = await req.json()
+    const { essay, taskType, prompt, model: selectedModel } = await req.json()
 
     if (!essay || !taskType) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Use only gemini-2.0-flash model - no configuration or fallback
-    const model = getGeminiModel()
+    // Use selected model or fall back to the default model
+    const model = getGeminiModel(selectedModel)
 
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 
@@ -62,34 +64,36 @@ ${essay}
 
 Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
-    // Call gemini-2.0-flash model using v1 API endpoint
+    // Call gemini-2.0-flash model using v1 API endpoint with rate limiting
     let result
     try {
-      result = await model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          responseMimeType: "application/json",
-          maxOutputTokens: 1024,
-        },
-      })
+      // Use server-side rate limiting and retry logic to prevent quota exhaustion
+      result = await withRateLimit(() =>
+        retryWithBackoff(
+          () => model.generateContent({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              responseMimeType: "application/json",
+              maxOutputTokens: 1024,
+            },
+          }),
+          GEMINI_RETRY_CONFIG
+        )
+      )
     } catch (apiError) {
       console.error("[v0] Gemini API error:", apiError)
       
       // Detect specific error types
       const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
       
-      if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
-        throw new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
-      }
-      
       if (errorMsg.includes("API key")) {
-        throw new Error("API key configuration error. Please contact support.")
+        throw new Error(ERROR_MESSAGES.API_KEY.MESSAGE)
       }
       
       // Re-throw for general error handler
@@ -130,21 +134,21 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorString.includes("resource_exhausted") ||
       errorString.includes("too many requests") ||
+      QUOTA_ERROR_PATTERN.test(errorString) ||
       (errorString.includes("rate limit") && !errorString.includes("unlimited"))
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút.",
+        error: ERROR_MESSAGES.RATE_LIMIT.MESSAGE,
         errorType: "RATE_LIMIT",
-        retryAfter: 120 // Suggest retry after 2 minutes
+        retryAfter: ERROR_MESSAGES.RATE_LIMIT.RETRY_AFTER_SECONDS
       }, { status: 429 })
     }
     
     // Generic error
     return Response.json({ 
-      error: error instanceof Error ? error.message : "Không thể chấm điểm bài viết. Vui lòng kiểm tra kết nối và thử lại.",
+      error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERIC.MESSAGE,
       errorType: "GENERIC"
     }, { status: 500 })
   }

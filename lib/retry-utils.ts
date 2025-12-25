@@ -19,7 +19,7 @@ const DEFAULT_CONFIG: Required<RetryConfig> = {
 /**
  * Check if an error is retryable (429 Too Many Requests or quota errors)
  */
-function isRetryableError(error: any): boolean {
+export function isRetryableError(error: any): boolean {
   if (!error) return false
 
   // Check for 429 status code
@@ -94,14 +94,14 @@ export async function retryWithBackoff<T>(
 }
 
 /**
- * Retry configuration optimized for Gemini API
- * Conservative retries to avoid hitting rate limits too aggressively
- * With server-side rate limiting, we need fewer retries
- * Reduced from 3 to 1 retry to minimize quota consumption on free tier
+ * Retry configuration optimized for Gemini API Free Tier
+ * Very conservative retries to avoid hitting rate limits
+ * With server-side rate limiting, we minimize retries to reduce quota usage
+ * Free tier has strict limits: 15 RPM, so we prefer failing fast over retries
  */
 export const GEMINI_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 1,
-  initialDelayMs: 5000,
-  maxDelayMs: 10000,
+  maxRetries: 0, // No retries - fail fast to avoid consuming quota
+  initialDelayMs: 8000, // Match rate limiter interval
+  maxDelayMs: 15000,
   backoffMultiplier: 2,
 }

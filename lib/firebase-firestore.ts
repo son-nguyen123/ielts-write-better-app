@@ -12,7 +12,7 @@ import {
   Timestamp,
   onSnapshot,
 } from "firebase/firestore"
-import type { TaskDocument } from "@/types/tasks"
+import type { TaskDocument, Revision } from "@/types/tasks"
 import { db } from "./firebase"
 
 // Tasks
@@ -107,6 +107,35 @@ export async function addRevisionToTask(userId: string, taskId: string, revision
     overallBand: revision.overallBand,
     summary: revision.summary,
     feedback: revision.feedback,
+    updatedAt: Timestamp.now(),
+  })
+}
+
+export async function updateRevisionInTask(
+  userId: string, 
+  taskId: string, 
+  revisionId: string, 
+  updates: Pick<Revision, 'improvedEssay' | 'improvementExplanation'>
+) {
+  const taskRef = doc(db, "users", userId, "tasks", taskId)
+  const taskDoc = await getDoc(taskRef)
+  
+  if (!taskDoc.exists()) {
+    throw new Error("Task not found")
+  }
+  
+  const taskData = taskDoc.data()
+  const existingRevisions = taskData.revisions || []
+  
+  const updatedRevisions = existingRevisions.map((rev: Revision) => {
+    if (rev.id === revisionId) {
+      return { ...rev, ...updates }
+    }
+    return rev
+  })
+  
+  await updateDoc(taskRef, {
+    revisions: updatedRevisions,
     updatedAt: Timestamp.now(),
   })
 }

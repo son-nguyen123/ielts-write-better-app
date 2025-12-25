@@ -8,9 +8,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useGeminiModels } from "@/hooks/use-gemini-models"
 import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
+import { ERROR_MESSAGES } from "@/lib/error-messages"
 import type { TaskFeedback } from "@/types/tasks"
 
 import {
@@ -59,6 +61,7 @@ export function NewTaskForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState<AIGeneratedPrompt | null>(null)
+  const { modelOptions, selectedModel, setSelectedModel, modelError } = useGeminiModels()
 
   // Load AI-generated prompt from sessionStorage on mount
   useEffect(() => {
@@ -142,6 +145,7 @@ export function NewTaskForm() {
           promptText: resolvedPrompt,
           userId: user.uid,
           promptId: selectedPrompt || null,
+          model: selectedModel || undefined,
         }),
       })
 
@@ -151,15 +155,18 @@ export function NewTaskForm() {
         // Check for rate limit errors
         let errorTitle = "Lỗi chấm điểm"
         let errorMessage = data?.error || "Không thể chấm điểm bài viết. Vui lòng thử lại."
+        let duration = 5000
         
         if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
-          errorTitle = "Hệ thống đang bận"
-          errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút."
+          errorTitle = ERROR_MESSAGES.RATE_LIMIT.TITLE
+          errorMessage = data?.error || ERROR_MESSAGES.RATE_LIMIT.MESSAGE
+          duration = 10000 // Show longer for rate limit errors
         }
         
         const error: any = new Error(errorMessage)
         error.title = errorTitle
         error.retryable = scoringResponse.status === 429
+        error.duration = duration
         throw error
       }
 
@@ -193,16 +200,38 @@ export function NewTaskForm() {
       // Provide more helpful error messages
       let errorDescription = error?.message || "Không thể gửi nhiệm vụ. Vui lòng thử lại."
       
-      // Add helpful suggestion for rate limit errors
-      if (error?.retryable) {
-        errorDescription += "\n\nGợi ý: Bạn có thể lưu bản nháp và thử lại sau, hoặc đợi một chút rồi nhấn gửi lại."
+      // Format error message for display - convert pipe-separated lines to JSX
+      // Messages from ERROR_MESSAGES.RATE_LIMIT use "|" as line separator
+      const formatErrorMessage = (msg: string) => {
+        if (msg.includes("|")) {
+          const lines = msg.split("|").map(line => line.trim())
+          return (
+            <div className="space-y-2">
+              {lines.map((line, idx) => (
+                <div key={idx}>{line}</div>
+              ))}
+            </div>
+          )
+        }
+        // Handle legacy \n\n format as well
+        if (msg.includes("\n\n")) {
+          const lines = msg.split("\n\n").map(line => line.trim())
+          return (
+            <div className="space-y-2">
+              {lines.map((line, idx) => (
+                <div key={idx}>{line}</div>
+              ))}
+            </div>
+          )
+        }
+        return msg
       }
       
       toast({
         title: error?.title || "Lỗi",
-        description: errorDescription,
+        description: formatErrorMessage(errorDescription),
         variant: "destructive",
-        duration: 7000, // Show longer for rate limit errors
+        duration: error?.duration || 7000, // Use custom duration if provided
       })
     } finally {
       setIsSubmitting(false)
@@ -232,6 +261,23 @@ export function NewTaskForm() {
                   <SelectItem value="Task 2">Task 2 (Essay)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Gemini Model for Scoring</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelOptions.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={modelError ?? "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
             </div>
 
             <div className="space-y-2">

@@ -5,11 +5,27 @@ import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 60
 
+interface AnalyzeSubmissionRequest {
+  submissionId: string
+  submissionTitle?: string
+  weakestSkill: string
+  currentScore: number
+  targetScore: number
+  keySuggestion?: string
+}
+
 /**
  * API endpoint to analyze a specific submission and generate targeted improvement suggestions
  * based on the gap between current score and target score
  */
 export async function POST(req: NextRequest) {
+  let requestData: AnalyzeSubmissionRequest | null = null
+  try {
+    requestData = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
   try {
     const { 
       submissionId,
@@ -18,7 +34,7 @@ export async function POST(req: NextRequest) {
       currentScore, 
       targetScore,
       keySuggestion 
-    } = await req.json()
+    } = requestData || {}
 
     if (!submissionId || !weakestSkill || currentScore === undefined || targetScore === undefined) {
       return Response.json({ 
@@ -26,7 +42,14 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    const gap = targetScore - currentScore
+    if (currentScore < 0 || currentScore > 9 || targetScore < 0 || targetScore > 9) {
+      return Response.json(
+        { error: "Scores must be between 0 and 9" },
+        { status: 400 }
+      )
+    }
+
+    const gap = computeGap(currentScore, targetScore)
 
     // Sanitize user inputs to prevent prompt injection
     const sanitizedTitle = submissionTitle?.replace(/[`"'\n\r]/g, ' ').substring(0, 200) || "Untitled"
@@ -99,7 +122,7 @@ Suggest one specific exercise or technique the student can use immediately to pr
 
     return Response.json({
       submissionId,
-      submissionTitle,
+      submissionTitle: sanitizedTitle,
       weakestSkill,
       currentScore,
       targetScore,
@@ -109,13 +132,31 @@ Suggest one specific exercise or technique the student can use immediately to pr
     })
   } catch (error) {
     console.error("[analyze-submission-gap] Error:", error)
-    return Response.json(
-      { 
-        error: error instanceof Error ? error.message : "Failed to analyze submission gap",
-        details: error instanceof Error ? error.stack : undefined
-      },
-      { status: 500 }
-    )
+    const criterionName = getCriterionFullName(requestData?.weakestSkill || "Writing skill")
+    const fallbackGap = computeGap(requestData?.currentScore, requestData?.targetScore)
+    const sanitizedFallbackTitle =
+      requestData?.submissionTitle?.replace(/[`"'\n\r]/g, " ").substring(0, 200) || "Untitled"
+    const fallbackSuggestions = buildFallbackSuggestions({
+      submissionTitle: sanitizedFallbackTitle,
+      weakestSkill: criterionName,
+      currentScore: requestData?.currentScore,
+      targetScore: requestData?.targetScore,
+      gap: fallbackGap,
+      keySuggestion: requestData?.keySuggestion
+    })
+
+    return Response.json({
+      submissionId: requestData?.submissionId,
+      submissionTitle: sanitizedFallbackTitle,
+      weakestSkill: requestData?.weakestSkill,
+      currentScore: requestData?.currentScore,
+      targetScore: requestData?.targetScore,
+      gap: fallbackGap,
+      improvementSuggestions: fallbackSuggestions,
+      generatedAt: new Date().toISOString(),
+      fallback: true,
+      error: error instanceof Error ? error.message : "Failed to analyze submission gap"
+    })
   }
 }
 
@@ -127,4 +168,46 @@ function getCriterionFullName(criterion: string): string {
     GRA: "Grammar & Accuracy"
   }
   return names[criterion] || criterion
+}
+
+function computeGap(currentScore?: number, targetScore?: number) {
+  const current = currentScore ?? 0
+  const target = targetScore ?? current
+  return target - current
+}
+
+function buildFallbackSuggestions({
+  submissionTitle,
+  weakestSkill,
+  currentScore,
+  targetScore,
+  gap,
+  keySuggestion
+}: {
+  submissionTitle?: string
+  weakestSkill?: string
+  currentScore?: number
+  targetScore?: number
+  gap?: number
+  keySuggestion?: string
+}) {
+  const criterionName = weakestSkill || "your weakest criterion"
+  const safeCurrent = currentScore ?? 0
+  const rawGap = gap ?? computeGap(currentScore, targetScore)
+  const safeGap = Math.max(0, rawGap)
+  const safeTarget = targetScore ?? safeCurrent + safeGap
+  const focusLine = keySuggestion ? `- Noted issue: ${keySuggestion}\n` : ""
+
+  return `### Quick improvement plan for ${criterionName}
+
+We couldn't generate an AI-powered analysis right now, so here is a concise plan to help you close the ${safeGap.toFixed(
+    1
+  )}-point gap from ${safeCurrent.toFixed(1)} to ${safeTarget.toFixed(1)}.
+
+${focusLine}- **What to improve:** Target ${criterionName.toLowerCase()} in your next drafts.
+- **Fixes to apply:** Simplify sentences, use clear topic sentences, and ensure every example links back to the question.
+- **Practice loop:** Revisit "${submissionTitle || "your latest submission"}", rewrite one paragraph focusing on ${criterionName.toLowerCase()}, and compare against band ${safeTarget.toFixed(
+    1
+  )} descriptors.
+- **Next step:** After rewriting, run the analysis again to get detailed AI feedback.`
 }
