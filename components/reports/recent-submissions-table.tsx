@@ -70,7 +70,7 @@ export function RecentSubmissionsTable({ submissions }: RecentSubmissionsTablePr
                   <td className="py-3 px-2">
                     <p className="font-medium line-clamp-1">{submission.title}</p>
                     <p className="text-xs text-muted-foreground md:hidden">
-                      {new Date(submission.createdAt).toLocaleDateString()}
+                      {new Date(submission.createdAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
                     </p>
                   </td>
                   <td className="py-3 px-2">
