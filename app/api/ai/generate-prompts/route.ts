@@ -5,6 +5,8 @@ import { withRateLimit } from "@/lib/server-rate-limiter"
 import { z } from "zod"
 
 export const maxDuration = 30
+const RATE_LIMIT_FALLBACK_MESSAGE =
+  "AI tạo đề bài đang vượt giới hạn sử dụng (prompt generation is rate limited). Đã dùng bộ đề mẫu tạm thời, vui lòng thử lại sau vài phút để nhận đề mới."
 
 const promptSchema = z.object({
   prompts: z.array(
@@ -17,6 +19,12 @@ const promptSchema = z.object({
     })
   ),
 })
+
+type GeneratePromptsRequest = {
+  taskType?: "Task 1" | "Task 2" | "all" | null
+  topics?: string[]
+  count?: number
+}
 
 // Helper function to generate sample prompts when API is not available
 function generateSamplePrompts(taskType: string, topics: string[], count: number) {
@@ -93,17 +101,18 @@ function generateSamplePrompts(taskType: string, topics: string[], count: number
 }
 
 export async function POST(req: Request) {
-  let requestData: any
+  let requestData: GeneratePromptsRequest | null = null
   try {
     requestData = await req.json()
   } catch {
     return Response.json({ error: "Invalid request body" }, { status: 400 })
   }
 
-  const { taskType, topics, count } = requestData
+  const { taskType, topics, count } = requestData || {}
   const promptCount = count || 4
   const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
-  const selectedTaskType = taskType || "all"
+  const selectedTaskType: "Task 1" | "Task 2" | "all" =
+    taskType === "Task 1" || taskType === "Task 2" || taskType === "all" ? taskType : "all"
 
   try {
     // Check if API key is available
@@ -174,10 +183,10 @@ Ensure variety in:
     
     if (isRateLimitError) {
       const samplePrompts = generateSamplePrompts(selectedTaskType, selectedTopics, promptCount)
-      return Response.json({ 
+      return Response.json({
         prompts: samplePrompts,
         fallback: true,
-        message: "AI tạo đề bài đang vượt giới hạn sử dụng. Đã dùng bộ đề mẫu tạm thời, vui lòng thử lại sau vài phút để nhận đề mới."
+        message: RATE_LIMIT_FALLBACK_MESSAGE,
       })
     }
     

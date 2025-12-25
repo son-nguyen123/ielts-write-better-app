@@ -5,12 +5,21 @@ import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 60
 
+interface AnalyzeSubmissionRequest {
+  submissionId: string
+  submissionTitle?: string
+  weakestSkill: string
+  currentScore: number
+  targetScore: number
+  keySuggestion?: string
+}
+
 /**
  * API endpoint to analyze a specific submission and generate targeted improvement suggestions
  * based on the gap between current score and target score
  */
 export async function POST(req: NextRequest) {
-  let requestData: any
+  let requestData: AnalyzeSubmissionRequest | null = null
   try {
     requestData = await req.json()
   } catch {
@@ -25,7 +34,7 @@ export async function POST(req: NextRequest) {
       currentScore, 
       targetScore,
       keySuggestion 
-    } = requestData
+    } = requestData || {}
 
     if (!submissionId || !weakestSkill || currentScore === undefined || targetScore === undefined) {
       return Response.json({ 
@@ -33,7 +42,14 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    const gap = targetScore - currentScore
+    if (currentScore < 0 || currentScore > 9 || targetScore < 0 || targetScore > 9) {
+      return Response.json(
+        { error: "Scores must be between 0 and 9" },
+        { status: 400 }
+      )
+    }
+
+    const gap = computeGap(currentScore, targetScore)
 
     // Sanitize user inputs to prevent prompt injection
     const sanitizedTitle = submissionTitle?.replace(/[`"'\n\r]/g, ' ').substring(0, 200) || "Untitled"
@@ -116,23 +132,26 @@ Suggest one specific exercise or technique the student can use immediately to pr
     })
   } catch (error) {
     console.error("[analyze-submission-gap] Error:", error)
-    const criterionName = getCriterionFullName(requestData?.weakestSkill || "")
+    const criterionName = getCriterionFullName(requestData?.weakestSkill || "Writing skill")
+    const fallbackGap = computeGap(requestData?.currentScore, requestData?.targetScore)
+    const sanitizedFallbackTitle =
+      requestData?.submissionTitle?.replace(/[`"'\n\r]/g, " ").substring(0, 200) || "Untitled"
     const fallbackSuggestions = buildFallbackSuggestions({
-      submissionTitle: requestData?.submissionTitle,
+      submissionTitle: sanitizedFallbackTitle,
       weakestSkill: criterionName,
       currentScore: requestData?.currentScore,
       targetScore: requestData?.targetScore,
-      gap: (requestData?.targetScore ?? 0) - (requestData?.currentScore ?? 0),
+      gap: fallbackGap,
       keySuggestion: requestData?.keySuggestion
     })
 
     return Response.json({
       submissionId: requestData?.submissionId,
-      submissionTitle: requestData?.submissionTitle || "Untitled",
+      submissionTitle: sanitizedFallbackTitle,
       weakestSkill: requestData?.weakestSkill,
       currentScore: requestData?.currentScore,
       targetScore: requestData?.targetScore,
-      gap: (requestData?.targetScore ?? 0) - (requestData?.currentScore ?? 0),
+      gap: fallbackGap,
       improvementSuggestions: fallbackSuggestions,
       generatedAt: new Date().toISOString(),
       fallback: true,
@@ -149,6 +168,12 @@ function getCriterionFullName(criterion: string): string {
     GRA: "Grammar & Accuracy"
   }
   return names[criterion] || criterion
+}
+
+function computeGap(currentScore?: number, targetScore?: number) {
+  const current = currentScore ?? 0
+  const target = targetScore ?? current
+  return target - current
 }
 
 function buildFallbackSuggestions({
@@ -168,8 +193,9 @@ function buildFallbackSuggestions({
 }) {
   const criterionName = weakestSkill || "your weakest criterion"
   const safeCurrent = currentScore ?? 0
-  const safeTarget = targetScore ?? safeCurrent + (gap ?? 1)
-  const safeGap = gap ?? Math.max(0, safeTarget - safeCurrent)
+  const rawGap = gap ?? computeGap(currentScore, targetScore)
+  const safeGap = Math.max(0, rawGap)
+  const safeTarget = targetScore ?? safeCurrent + safeGap
   const focusLine = keySuggestion ? `- Noted issue: ${keySuggestion}\n` : ""
 
   return `### Quick improvement plan for ${criterionName}
