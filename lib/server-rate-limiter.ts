@@ -40,7 +40,10 @@ class ServerRateLimiter {
       }
 
       this.queue.push(request)
-      console.log(`[RateLimiter] Request queued. Queue length: ${this.queue.length}, Active: ${this.activeRequests}`)
+      // Log only in development to avoid production noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Request queued. Queue length: ${this.queue.length}, Active: ${this.activeRequests}`)
+      }
       this.processQueue()
     })
   }
@@ -51,7 +54,9 @@ class ServerRateLimiter {
   private async processQueue() {
     // Can't process if at max concurrent requests
     if (this.activeRequests >= this.config.maxConcurrent) {
-      console.log(`[RateLimiter] Max concurrent requests reached (${this.activeRequests}/${this.config.maxConcurrent})`)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Max concurrent requests reached (${this.activeRequests}/${this.config.maxConcurrent})`)
+      }
       return
     }
 
@@ -60,7 +65,9 @@ class ServerRateLimiter {
     const timeSinceLastRequest = now - this.lastRequestTime
     if (timeSinceLastRequest < this.config.minInterval && this.lastRequestTime > 0) {
       const waitTime = this.config.minInterval - timeSinceLastRequest
-      console.log(`[RateLimiter] Rate limiting: waiting ${waitTime}ms before next request`)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Rate limiting: waiting ${waitTime}ms before next request`)
+      }
       // Schedule next processing after minimum interval
       setTimeout(() => this.processQueue(), waitTime)
       return
@@ -73,7 +80,9 @@ class ServerRateLimiter {
 
     this.activeRequests++
     this.lastRequestTime = Date.now()
-    console.log(`[RateLimiter] Processing request. Active: ${this.activeRequests}, Queue: ${this.queue.length}`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[RateLimiter] Processing request. Active: ${this.activeRequests}, Queue: ${this.queue.length}`)
+    }
 
     try {
       const result = await request.fn()
@@ -82,7 +91,9 @@ class ServerRateLimiter {
       request.reject(error)
     } finally {
       this.activeRequests--
-      console.log(`[RateLimiter] Request completed. Active: ${this.activeRequests}, Queue: ${this.queue.length}`)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Request completed. Active: ${this.activeRequests}, Queue: ${this.queue.length}`)
+      }
       
       // Process next request after minimum interval
       if (this.queue.length > 0) {

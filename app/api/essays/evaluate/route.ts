@@ -2,6 +2,7 @@ import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG, isRetryableError } from "@/lib/retry-utils"
 import { StatusError } from "@/lib/status-error"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { ERROR_MESSAGES } from "@/lib/error-messages"
 import type { LineLevelFeedback, TaskFeedback } from "@/types/tasks"
 
 export const maxDuration = 60
@@ -117,7 +118,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       }
       
       if (errorMsg.includes("API key")) {
-        throw new Error("API key configuration error. Please contact support.")
+        throw new Error(ERROR_MESSAGES.API_KEY.MESSAGE)
       }
       
       throw apiError
@@ -153,7 +154,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     // Validate that required fields are present
     if (!parsedFeedback.overall_band || !parsedFeedback.criteria) {
       console.error("[evaluate] AI response missing required fields:", parsedFeedback)
-      throw new Error("Phản hồi từ AI không đầy đủ. Vui lòng thử lại sau.")
+      throw new Error(ERROR_MESSAGES.INCOMPLETE.MESSAGE)
     }
 
     // Transform API response to match our internal format
@@ -177,16 +178,14 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "⏱️ Hệ thống đang bận. API chấm điểm đã đạt giới hạn sử dụng miễn phí.\n\n" +
-               "🔄 Vui lòng đợi 2-3 phút rồi thử lại.\n\n" +
-               "💡 Mẹo: Bạn có thể lưu bản nháp trước để không mất nội dung.",
+        error: ERROR_MESSAGES.RATE_LIMIT.MESSAGE,
         errorType: "RATE_LIMIT",
-        retryAfter: 180
+        retryAfter: ERROR_MESSAGES.RATE_LIMIT.RETRY_AFTER_SECONDS
       }, { status: 429 })
     }
     
     return Response.json({ 
-      error: error instanceof Error ? error.message : "Không thể chấm điểm bài viết. Vui lòng kiểm tra kết nối và thử lại.",
+      error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERIC.MESSAGE,
       errorType: "GENERIC"
     }, { status: 500 })
   }
@@ -200,7 +199,7 @@ function transformCriteria(criteria: any) {
     const criterionData = criteria[key]
     if (!criterionData || typeof criterionData.score !== 'number') {
       console.error(`[evaluate] Missing or invalid criterion data for ${key}:`, criterionData)
-      throw new Error(`Dữ liệu tiêu chí ${key} không hợp lệ từ AI`)
+      throw new Error(ERROR_MESSAGES.CRITERIA.MESSAGE.replace('{key}', key))
     }
     result[key] = {
       score: criterionData.score,

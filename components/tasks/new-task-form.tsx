@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
+import { ERROR_MESSAGES } from "@/lib/error-messages"
 import type { TaskFeedback } from "@/types/tasks"
 
 import {
@@ -154,8 +155,8 @@ export function NewTaskForm() {
         let duration = 5000
         
         if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
-          errorTitle = "⏱️ Hệ thống đang bận"
-          errorMessage = data?.error || "API chấm điểm đã đạt giới hạn sử dụng miễn phí.\n\nVui lòng đợi 2-3 phút rồi thử lại."
+          errorTitle = ERROR_MESSAGES.RATE_LIMIT.TITLE
+          errorMessage = data?.error || ERROR_MESSAGES.RATE_LIMIT.MESSAGE
           duration = 10000 // Show longer for rate limit errors
         }
         
