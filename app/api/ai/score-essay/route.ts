@@ -62,22 +62,28 @@ ${essay}
 
 Provide a comprehensive IELTS evaluation following the JSON structure specified. Pay special attention to whether the essay addresses the specific prompt above.`
 
-    // Call gemini-2.0-flash model using v1 API endpoint
+    // Call gemini-2.0-flash model using v1 API endpoint with rate limiting
     let result
     try {
-      result = await model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          responseMimeType: "application/json",
-          maxOutputTokens: 1024,
-        },
-      })
+      // Use server-side rate limiting and retry logic to prevent quota exhaustion
+      result = await withRateLimit(() =>
+        retryWithBackoff(
+          () => model.generateContent({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              responseMimeType: "application/json",
+              maxOutputTokens: 1024,
+            },
+          }),
+          GEMINI_RETRY_CONFIG
+        )
+      )
     } catch (apiError) {
       console.error("[v0] Gemini API error:", apiError)
       
