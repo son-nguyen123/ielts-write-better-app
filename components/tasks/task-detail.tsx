@@ -10,7 +10,7 @@ import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, Refres
 import { useToast } from "@/hooks/use-toast"
 import { useGeminiModels } from "@/hooks/use-gemini-models"
 import { useAuth } from "@/components/auth/auth-provider"
-import { getTask, addRevisionToTask } from "@/lib/firebase-firestore"
+import { getTask, addRevisionToTask, updateRevisionInTask } from "@/lib/firebase-firestore"
 import type { CriterionKey, TaskDocument, TaskFeedback, LineLevelFeedback } from "@/types/tasks"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,6 +41,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const [highlightedFeedback, setHighlightedFeedback] = useState<LineLevelFeedback | null>(null)
   const [improvementRequests, setImprovementRequests] = useState<Record<string, any>>({})
   const [loadingImprovements, setLoadingImprovements] = useState<Record<string, boolean>>({})
+  const [loadingImprovedEssays, setLoadingImprovedEssays] = useState<Record<string, boolean>>({})
   const { modelOptions, selectedModel, setSelectedModel, modelError } = useGeminiModels()
 
   useEffect(() => {
@@ -185,6 +186,55 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       })
     } finally {
       setLoadingImprovements(prev => ({ ...prev, [key]: false }))
+    }
+  }
+
+  const handleGenerateImprovedEssay = async (revisionId: string, feedback: TaskFeedback) => {
+    if (!user || !task) return
+    
+    setLoadingImprovedEssays(prev => ({ ...prev, [revisionId]: true }))
+    
+    try {
+      const res = await fetch("/api/essays/generate-improved-essay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalEssay: task.response,
+          feedback: feedback,
+          prompt: task.prompt,
+          taskType: task.taskType,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to generate improved essay")
+      }
+
+      // Update the revision with the improved essay
+      await updateRevisionInTask(user.uid, taskId, revisionId, {
+        improvedEssay: data.improvedEssay,
+        improvementExplanation: data.explanation,
+      })
+
+      // Refresh task data
+      const updatedTask = await getTask(user.uid, taskId)
+      setTask(updatedTask as TaskDocument)
+
+      toast({
+        title: "Bài mẫu đã sẵn sàng",
+        description: "Đã tạo bài viết cải thiện dựa trên phản hồi.",
+      })
+    } catch (error: any) {
+      console.error("[v0] Failed to generate improved essay:", error)
+      toast({
+        title: "Không thể tạo bài mẫu",
+        description: error.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingImprovedEssays(prev => ({ ...prev, [revisionId]: false }))
     }
   }
 
@@ -669,6 +719,77 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             </div>
                           </div>
                           <p className="text-sm text-muted-foreground">{revision.summary}</p>
+                          
+                          {/* Improved Essay Section */}
+                          {revision.feedback && (
+                            <div className="mt-3">
+                              {!revision.improvedEssay ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleGenerateImprovedEssay(revision.id, revision.feedback!)}
+                                  disabled={loadingImprovedEssays[revision.id]}
+                                  className="w-full"
+                                >
+                                  {loadingImprovedEssays[revision.id] ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Đang tạo bài mẫu cải thiện...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="h-4 w-4 mr-2" />
+                                      Tạo bài mẫu cải thiện
+                                    </>
+                                  )}
+                                </Button>
+                              ) : (
+                                <Collapsible>
+                                  <div className="space-y-2">
+                                    <CollapsibleTrigger asChild>
+                                      <Button variant="outline" size="sm" className="w-full">
+                                        <Sparkles className="h-4 w-4 mr-2 text-success" />
+                                        Xem bài mẫu cải thiện
+                                      </Button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="mt-3">
+                                      <div className="p-4 rounded-lg bg-success/5 border border-success/20 space-y-3">
+                                        <div className="flex items-start justify-between">
+                                          <p className="text-xs font-semibold text-success mb-2">
+                                            <Sparkles className="h-3 w-3 inline mr-1" />
+                                            Bài viết đã cải thiện
+                                          </p>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(revision.improvedEssay || "")
+                                              toast({
+                                                title: "Đã sao chép",
+                                                description: "Bài mẫu đã được sao chép vào clipboard.",
+                                              })
+                                            }}
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                        <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground">
+                                          {revision.improvedEssay}
+                                        </div>
+                                        {revision.improvementExplanation && (
+                                          <div className="pt-3 border-t border-success/20">
+                                            <p className="text-xs font-semibold mb-1">Giải thích cải thiện:</p>
+                                            <p className="text-xs text-muted-foreground">{revision.improvementExplanation}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              )}
+                            </div>
+                          )}
                           
                           {hasErrors && (
                             <CollapsibleContent className="mt-3">

@@ -111,6 +111,30 @@ export async function addRevisionToTask(userId: string, taskId: string, revision
   })
 }
 
+export async function updateRevisionInTask(userId: string, taskId: string, revisionId: string, updates: any) {
+  const taskRef = doc(db, "users", userId, "tasks", taskId)
+  const taskDoc = await getDoc(taskRef)
+  
+  if (!taskDoc.exists()) {
+    throw new Error("Task not found")
+  }
+  
+  const taskData = taskDoc.data()
+  const existingRevisions = taskData.revisions || []
+  
+  const updatedRevisions = existingRevisions.map((rev: any) => {
+    if (rev.id === revisionId) {
+      return { ...rev, ...updates }
+    }
+    return rev
+  })
+  
+  await updateDoc(taskRef, {
+    revisions: updatedRevisions,
+    updatedAt: Timestamp.now(),
+  })
+}
+
 export async function deleteTask(userId: string, taskId: string) {
   const taskRef = doc(db, "users", userId, "tasks", taskId)
   await deleteDoc(taskRef)

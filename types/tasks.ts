@@ -34,6 +34,8 @@ export interface Revision {
   summary: string
   createdAt: Timestamp
   feedback?: TaskFeedback
+  improvedEssay?: string
+  improvementExplanation?: string
 }
 
 export interface TaskDocument {
