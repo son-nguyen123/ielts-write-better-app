@@ -72,27 +72,25 @@ Nghĩa là: "API của tôi đã hết hạn, tôi muốn thay API thì làm sao
 
 ### Các Bước Cơ Bản:
 
-```
-1️⃣ Lấy API key mới:
-   → https://aistudio.google.com/app/apikey
-   → Nhấn "Create API Key"
-   → Copy key (AIzaSy...)
+**1️⃣ Lấy API key mới:**
+- Truy cập: https://aistudio.google.com/app/apikey
+- Nhấn "Create API Key"
+- Copy key (AIzaSy...)
 
-2️⃣ Cập nhật .env.local:
-   → Mở file .env.local
-   → Thay GEMINI_API_KEY=old_key
-   → Thành GEMINI_API_KEY=new_key
-   → Lưu file
+**2️⃣ Cập nhật .env.local:**
+- Mở file .env.local
+- Thay `GEMINI_API_KEY=old_key`
+- Thành `GEMINI_API_KEY=new_key`
+- Lưu file
 
-3️⃣ Restart server:
-   → Ctrl+C (dừng)
-   → npm run dev (khởi động lại)
+**3️⃣ Restart server:**
+- Ctrl+C (dừng)
+- `npm run dev` (khởi động lại)
 
-4️⃣ Test:
-   → Vào http://localhost:3000
-   → Thử chấm điểm essay
-   → Check console không có lỗi
-```
+**4️⃣ Test:**
+- Vào http://localhost:3000
+- Thử chấm điểm essay
+- Check console không có lỗi
 
 ---
 
