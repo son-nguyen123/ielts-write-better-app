@@ -1,5 +1,5 @@
 import { getGeminiModel } from "@/lib/gemini-native"
-import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG, isRetryableError } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
 import type { LineLevelFeedback, TaskFeedback } from "@/types/tasks"
 
@@ -13,27 +13,6 @@ class StatusError extends Error {
     this.name = "StatusError"
     this.status = status
   }
-}
-
-function isQuotaErrorMessage(message: string) {
-  if (!message) return false
-  const lower = message.toLowerCase()
-  return (
-    lower.includes("quota") ||
-    lower.includes("resource_exhausted") ||
-    lower.includes("status 429") ||
-    lower.includes("http 429")
-  )
-}
-
-function isRateLimitMessage(message: string) {
-  if (!message) return false
-  const lower = message.toLowerCase()
-  return (
-    isQuotaErrorMessage(message) ||
-    lower.includes("too many requests") ||
-    (lower.includes("rate limit") && !lower.includes("unlimited"))
-  )
 }
 
 export async function POST(req: Request) {
@@ -141,9 +120,8 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       console.error("[evaluate] Gemini API error:", apiError)
       
       const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
-      const quotaExceeded = isQuotaErrorMessage(errorMsg)
       
-      if (quotaExceeded) {
+      if (isRetryableError(apiError)) {
         throw new StatusError("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.", 429)
       }
       
@@ -204,11 +182,10 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
   } catch (error: any) {
     console.error("[evaluate] Error:", error)
     
-    const errorMessage = error?.message || error?.toString() || ""
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      isRateLimitMessage(errorMessage)
+      isRetryableError(error)
     
     if (isRateLimitError) {
       return Response.json({ 
