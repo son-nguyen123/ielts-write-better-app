@@ -65,16 +65,10 @@ Nghĩa là: "API của tôi đã hết hạn, tôi muốn thay API thì làm sao
 ### Nếu API Key Hết Hạn, Làm Thế Nào?
 
 **Option 1: Đọc Hướng Dẫn Nhanh (5 phút)**
-```bash
-# Mở file:
-QUICK_START_VI.md
-```
+- Mở file: [QUICK_START_VI.md](./QUICK_START_VI.md)
 
 **Option 2: Đọc Hướng Dẫn Đầy Đủ (15 phút)**
-```bash
-# Mở file:
-HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md
-```
+- Mở file: [HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md](./HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md)
 
 ### Các Bước Cơ Bản:
 
@@ -194,10 +188,10 @@ HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md
 
 | Ngày | Thay Đổi |
 |------|----------|
-| 25/12/2024 | ✅ Tạo QUICK_START_VI.md |
-| 25/12/2024 | ✅ Tạo HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md |
-| 25/12/2024 | ✅ Cập nhật README.md |
-| 25/12/2024 | ✅ Tạo SUMMARY.md |
+| 25/12/2024 | ✅ Tạo QUICK_START_VI.md - Hướng dẫn nhanh |
+| 25/12/2024 | ✅ Tạo HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md - Hướng dẫn đầy đủ |
+| 25/12/2024 | ✅ Cập nhật README.md với link tiếng Việt |
+| 25/12/2024 | ✅ Tạo tài liệu tổng hợp này |
 
 ---
 
