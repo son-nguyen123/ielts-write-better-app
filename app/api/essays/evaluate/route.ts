@@ -15,8 +15,6 @@ class StatusError extends Error {
   }
 }
 
-const STATUS_429_REGEX = /\b429\b/
-
 function isQuotaErrorMessage(message: string) {
   if (!message) return false
   const lower = message.toLowerCase()
@@ -24,8 +22,7 @@ function isQuotaErrorMessage(message: string) {
     lower.includes("quota") ||
     lower.includes("resource_exhausted") ||
     lower.includes("status 429") ||
-    lower.includes("http 429") ||
-    STATUS_429_REGEX.test(lower)
+    lower.includes("http 429")
   )
 }
 
