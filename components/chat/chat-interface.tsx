@@ -132,13 +132,30 @@ export function ChatInterface() {
 
       if (!response.ok) {
         let errorMessage = `Request failed with status ${response.status}`
+        let errorType = "GENERIC"
         try {
           const data = await response.json()
           if (data?.error && typeof data.error === "string") {
             errorMessage = data.error
           }
+          if (data?.errorType) {
+            errorType = data.errorType
+          }
         } catch (jsonError) {
           console.error("Failed to parse error response", jsonError)
+        }
+
+        // If it's a token limit error, show special message and return early
+        if (errorType === "TOKEN_LIMIT" || errorMessage.toLowerCase().includes("quá dài")) {
+          setMessages((prev) => [
+            ...prev,
+            { 
+              role: "assistant", 
+              content: errorMessage + "\n\n💡 **Gợi ý**: Làm mới trang để bắt đầu cuộc trò chuyện mới."
+            },
+          ])
+          setIsLoading(false)
+          return
         }
 
         throw new Error(errorMessage)
@@ -171,7 +188,7 @@ export function ChatInterface() {
     } catch (error) {
       console.error("[v0] Error in chat:", error)
       
-      // Check if it's a rate limit error
+      // Check if it's a rate limit or token error
       const errorMessage = error instanceof Error ? error.message : String(error)
       const isRateLimitError = 
         errorMessage.toLowerCase().includes("vượt giới hạn") ||
@@ -179,9 +196,16 @@ export function ChatInterface() {
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("too many requests")
       
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
+      const isTokenError = 
+        errorMessage.toLowerCase().includes("quá dài") ||
+        errorMessage.toLowerCase().includes("token")
+      
+      let responseMessage = "Sorry, I encountered an error. Please try again."
+      if (isRateLimitError) {
+        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+      } else if (isTokenError) {
+        responseMessage = errorMessage + "\n\n💡 **Gợi ý**: Làm mới trang để bắt đầu cuộc trò chuyện mới."
+      }
       
       setMessages((prev) => [
         ...prev,
@@ -217,13 +241,30 @@ export function ChatInterface() {
 
       if (!response.ok) {
         let errorMessage = `Request failed with status ${response.status}`
+        let errorType = "GENERIC"
         try {
           const data = await response.json()
           if (data?.error && typeof data.error === "string") {
             errorMessage = data.error
           }
+          if (data?.errorType) {
+            errorType = data.errorType
+          }
         } catch (jsonError) {
           console.error("Failed to parse error response", jsonError)
+        }
+
+        // If it's a token limit error, show special message and return early
+        if (errorType === "TOKEN_LIMIT" || errorMessage.toLowerCase().includes("quá dài")) {
+          setMessages((prev) => [
+            ...prev,
+            { 
+              role: "assistant", 
+              content: errorMessage + "\n\n💡 **Gợi ý**: Làm mới trang để bắt đầu cuộc trò chuyện mới."
+            },
+          ])
+          setIsLoading(false)
+          return
         }
 
         throw new Error(errorMessage)
@@ -263,9 +304,16 @@ export function ChatInterface() {
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("too many requests")
       
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
+      const isTokenError = 
+        errorMessage.toLowerCase().includes("quá dài") ||
+        errorMessage.toLowerCase().includes("token")
+      
+      let responseMessage = "Sorry, I encountered an error. Please try again."
+      if (isRateLimitError) {
+        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+      } else if (isTokenError) {
+        responseMessage = errorMessage + "\n\n💡 **Gợi ý**: Làm mới trang để bắt đầu cuộc trò chuyện mới."
+      }
       
       setMessages((prev) => [
         ...prev,

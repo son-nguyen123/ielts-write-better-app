@@ -17,7 +17,27 @@ const RATE_LIMIT_FALLBACK_MESSAGE =
 const RATE_LIMIT_FALLBACK_HEADER = "x-ai-fallback"
 const RATE_LIMIT_FALLBACK_VALUE = "rate-limit"
 
+// Maximum number of message pairs (user + assistant) to keep in history
+// This helps prevent context window overflow with long conversations
+// Keeping 10 pairs = 20 messages max in history (plus current message)
+const MAX_MESSAGE_PAIRS = 10
+
 export const maxDuration = 30
+
+/**
+ * Truncate message history to prevent context window overflow
+ * Keeps only the most recent message pairs to fit within token limits
+ */
+function truncateMessageHistory(messages: any[]): any[] {
+  if (messages.length <= MAX_MESSAGE_PAIRS * 2) {
+    return messages
+  }
+
+  // Keep the most recent MAX_MESSAGE_PAIRS * 2 messages
+  // This ensures we have a balanced conversation history
+  const startIndex = messages.length - (MAX_MESSAGE_PAIRS * 2)
+  return messages.slice(startIndex)
+}
 
 export async function GET() {
   return NextResponse.json({
@@ -45,6 +65,13 @@ export async function POST(req: Request) {
       content: typeof m.content === "string" ? m.content : String(m.content ?? ""),
     }))
 
+    // Truncate message history to prevent token overflow
+    const truncatedMessages = truncateMessageHistory(normalizedMessages)
+
+    if (process.env.NODE_ENV === 'development' && truncatedMessages.length < normalizedMessages.length) {
+      console.log(`[/api/ai/chat] Truncated message history from ${normalizedMessages.length} to ${truncatedMessages.length} messages`)
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json({ error: "Missing GEMINI_API_KEY in environment" }, { status: 500 })
     }
@@ -66,7 +93,7 @@ Prompt: ${attachedTask?.prompt ?? ""}
 Essay: ${attachedTask?.essay ?? ""}`
     }
 
-    const geminiMessages = normalizedMessages.map((msg: any) => ({
+    const geminiMessages = truncatedMessages.map((msg: any) => ({
       role: msg.role === "assistant" ? "model" : "user",
       parts: [{ text: msg.content }],
     }))
@@ -128,6 +155,14 @@ Essay: ${attachedTask?.essay ?? ""}`
       errorMessage.toLowerCase().includes("rate limit") ||
       errorMessage.includes("429")
     
+    // Check for token/context limit errors
+    const isTokenLimitError =
+      err?.status === 400 ||
+      errorMessage.toLowerCase().includes("token") ||
+      errorMessage.toLowerCase().includes("context length") ||
+      errorMessage.toLowerCase().includes("maximum context") ||
+      errorMessage.toLowerCase().includes("too long")
+    
     if (isRateLimitError) {
       const encoder = new TextEncoder()
       const stream = new ReadableStream({
@@ -143,6 +178,13 @@ Essay: ${attachedTask?.essay ?? ""}`
       }
 
       return new Response(stream, { headers: fallbackHeaders })
+    }
+    
+    if (isTokenLimitError) {
+      return NextResponse.json({ 
+        error: "Cuộc trò chuyện quá dài. Vui lòng bắt đầu cuộc trò chuyện mới hoặc rút ngắn tin nhắn của bạn.",
+        errorType: "TOKEN_LIMIT"
+      }, { status: 400 })
     }
     
     return NextResponse.json({ 
