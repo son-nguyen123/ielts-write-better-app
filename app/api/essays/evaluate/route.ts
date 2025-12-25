@@ -16,7 +16,13 @@ class StatusError extends Error {
 
 function isQuotaErrorMessage(message: string) {
   const lower = message.toLowerCase()
-  return lower.includes("quota") || lower.includes("resource_exhausted") || lower.includes("429")
+  return (
+    lower.includes("quota") ||
+    lower.includes("resource_exhausted") ||
+    lower.includes("status 429") ||
+    lower.includes("http 429") ||
+    /\b429\b/.test(lower)
+  )
 }
 
 export async function POST(req: Request) {
@@ -194,7 +200,6 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorString.includes("resource_exhausted") ||
       errorString.includes("too many requests") ||
       isQuota ||
       (errorString.includes("rate limit") && !errorString.includes("unlimited"))
