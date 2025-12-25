@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Use selected model or default to gemini-2.0-flash
+    // Use selected model or fall back to the default model
     const model = getGeminiModel(selectedModel)
 
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
