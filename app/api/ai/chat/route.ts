@@ -3,7 +3,23 @@ import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
 
+const STREAM_HEADERS = {
+  "Content-Type": "text/plain; charset=utf-8",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+}
+
+const RATE_LIMIT_FALLBACK_MESSAGE =
+  "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+
 export const maxDuration = 30
+
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    message: "Use POST to start an AI chat conversation.",
+  })
+}
 
 export async function POST(req: Request) {
   try {
@@ -88,13 +104,7 @@ Essay: ${attachedTask?.essay ?? ""}`
       },
     })
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    })
+    return new Response(stream, { headers: STREAM_HEADERS })
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
     console.error("[/api/ai/chat] Error details:", {
@@ -114,10 +124,15 @@ Essay: ${attachedTask?.essay ?? ""}`
       errorMessage.includes("429")
     
     if (isRateLimitError) {
-      return NextResponse.json({ 
-        error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(RATE_LIMIT_FALLBACK_MESSAGE))
+          controller.close()
+        },
+      })
+
+      return new Response(stream, { headers: { ...STREAM_HEADERS, "x-ai-fallback": "rate-limit" } })
     }
     
     return NextResponse.json({ 
