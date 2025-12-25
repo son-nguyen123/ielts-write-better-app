@@ -5,6 +5,20 @@ import type { LineLevelFeedback, TaskFeedback } from "@/types/tasks"
 
 export const maxDuration = 60
 
+class StatusError extends Error {
+  status?: number
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+function isQuotaErrorMessage(message: string) {
+  const lower = message.toLowerCase()
+  return lower.includes("quota") || lower.includes("resource_exhausted") || lower.includes("429")
+}
+
 export async function POST(req: Request) {
   try {
     const { promptText, taskType, essayText, userId, promptId } = await req.json()
@@ -110,11 +124,10 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       console.error("[evaluate] Gemini API error:", apiError)
       
       const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
+      const quotaExceeded = isQuotaErrorMessage(errorMsg)
       
-      if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
-        const quotaError = new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
-        (quotaError as { status?: number }).status = 429
-        throw quotaError
+      if (quotaExceeded) {
+        throw new StatusError("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.", 429)
       }
       
       if (errorMsg.includes("API key")) {
@@ -176,13 +189,14 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     
     const errorMessage = error?.message || error?.toString() || ""
     const errorString = errorMessage.toLowerCase()
+    const isQuota = isQuotaErrorMessage(errorMessage)
     
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
       errorString.includes("resource_exhausted") ||
       errorString.includes("too many requests") ||
-      errorString.includes("quota") ||
+      isQuota ||
       (errorString.includes("rate limit") && !errorString.includes("unlimited"))
     
     if (isRateLimitError) {
