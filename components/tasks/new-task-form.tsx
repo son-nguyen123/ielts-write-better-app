@@ -47,6 +47,12 @@ type AIGeneratedPrompt = {
   tags: string[]
 }
 
+interface GeminiModelOption {
+  id: string
+  displayName: string
+  description?: string
+}
+
 export function NewTaskForm() {
   const router = useRouter()
   const { toast } = useToast()
@@ -60,6 +66,9 @@ export function NewTaskForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState<AIGeneratedPrompt | null>(null)
+  const [modelOptions, setModelOptions] = useState<GeminiModelOption[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>("")
+  const [modelError, setModelError] = useState<string | null>(null)
 
   // Load AI-generated prompt from sessionStorage on mount
   useEffect(() => {
@@ -78,6 +87,32 @@ export function NewTaskForm() {
         console.error("Failed to parse stored prompt:", error)
       }
     }
+  }, [])
+
+  // Fetch available models
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await fetch("/api/ai/models")
+
+        if (!response.ok) {
+          const { error } = await response.json().catch(() => ({ error: "" }))
+          throw new Error(error || "Failed to load Gemini models")
+        }
+
+        const data = await response.json()
+        const options: GeminiModelOption[] = data.models ?? []
+
+        setModelOptions(options)
+        setSelectedModel(data.defaultModelId ?? options[0]?.id ?? "")
+        setModelError(null)
+      } catch (error) {
+        console.error("Failed to load Gemini models", error)
+        setModelError(error instanceof Error ? error.message : "Failed to load Gemini models")
+      }
+    }
+
+    fetchModels()
   }, [])
 
   const prompts = taskType === "Task 1" ? task1Prompts : task2Prompts
@@ -143,6 +178,7 @@ export function NewTaskForm() {
           promptText: resolvedPrompt,
           userId: user.uid,
           promptId: selectedPrompt || null,
+          model: selectedModel || undefined,
         }),
       })
 
@@ -236,6 +272,23 @@ export function NewTaskForm() {
                   <SelectItem value="Task 2">Task 2 (Essay)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Gemini Model for Scoring</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelOptions.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={modelError ?? "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
             </div>
 
             <div className="space-y-2">

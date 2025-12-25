@@ -13,6 +13,8 @@ import { getTask, addRevisionToTask } from "@/lib/firebase-firestore"
 import type { CriterionKey, TaskDocument, TaskFeedback, LineLevelFeedback } from "@/types/tasks"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format } from "date-fns"
 import {
   Collapsible,
@@ -22,6 +24,12 @@ import {
 
 interface TaskDetailProps {
   taskId: string
+}
+
+interface GeminiModelOption {
+  id: string
+  displayName: string
+  description?: string
 }
 
 export function TaskDetail({ taskId }: TaskDetailProps) {
@@ -38,6 +46,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const [highlightedFeedback, setHighlightedFeedback] = useState<LineLevelFeedback | null>(null)
   const [improvementRequests, setImprovementRequests] = useState<Record<string, any>>({})
   const [loadingImprovements, setLoadingImprovements] = useState<Record<string, boolean>>({})
+  const [modelOptions, setModelOptions] = useState<GeminiModelOption[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>("")
+  const [modelError, setModelError] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -85,6 +96,32 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     }
   }, [authLoading, taskId, user])
 
+  // Fetch available models
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await fetch("/api/ai/models")
+
+        if (!response.ok) {
+          const { error } = await response.json().catch(() => ({ error: "" }))
+          throw new Error(error || "Failed to load Gemini models")
+        }
+
+        const data = await response.json()
+        const options: GeminiModelOption[] = data.models ?? []
+
+        setModelOptions(options)
+        setSelectedModel(data.defaultModelId ?? options[0]?.id ?? "")
+        setModelError(null)
+      } catch (error) {
+        console.error("Failed to load Gemini models", error)
+        setModelError(error instanceof Error ? error.message : "Failed to load Gemini models")
+      }
+    }
+
+    fetchModels()
+  }, [])
+
   const handleRevaluate = async () => {
     if (!user || !task) return
     
@@ -98,6 +135,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
           taskType: task.taskType,
           promptText: task.prompt,
           userId: user.uid,
+          model: selectedModel || undefined,
           promptId: task.promptId,
         }),
       })
@@ -476,6 +514,22 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     onChange={(e) => setEditedResponse(e.target.value)}
                     className="min-h-[300px] font-mono text-sm"
                   />
+                  <div className="space-y-2">
+                    <Label className="text-sm">Gemini Model for Re-scoring</Label>
+                    <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelOptions.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={modelError ?? "Select a model"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modelOptions.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {modelError && <p className="text-xs text-destructive">{modelError}</p>}
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleRevaluate}

@@ -8,14 +8,14 @@ const QUOTA_ERROR_PATTERN = /(resource_exhausted|quota exceeded|quota_exceeded|q
 
 export async function POST(req: Request) {
   try {
-    const { essay, taskType, prompt } = await req.json()
+    const { essay, taskType, prompt, model: selectedModel } = await req.json()
 
     if (!essay || !taskType) {
       return Response.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Use only gemini-2.0-flash model - no configuration or fallback
-    const model = getGeminiModel()
+    // Use selected model or default to gemini-2.0-flash
+    const model = getGeminiModel(selectedModel)
 
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 
