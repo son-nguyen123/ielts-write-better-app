@@ -10,9 +10,12 @@ class StatusError extends Error {
 
   constructor(message: string, status?: number) {
     super(message)
+    this.name = "StatusError"
     this.status = status
   }
 }
+
+const STATUS_429_REGEX = /\b429\b/
 
 function isQuotaErrorMessage(message: string) {
   if (!message) return false
@@ -22,7 +25,7 @@ function isQuotaErrorMessage(message: string) {
     lower.includes("resource_exhausted") ||
     lower.includes("status 429") ||
     lower.includes("http 429") ||
-    /\b429\b/.test(lower)
+    STATUS_429_REGEX.test(lower)
   )
 }
 
