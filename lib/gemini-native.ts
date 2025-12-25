@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 let genAI: GoogleGenerativeAI | null = null
+const DEFAULT_MODEL =
+  (process.env.GEMINI_MODEL ?? "").trim() || "gemini-1.5-flash"
 
 export function getGeminiClient() {
   if (!genAI) {
@@ -16,9 +18,8 @@ export function getGeminiClient() {
 
 export function getGeminiModel(modelName?: string) {
   const client = getGeminiClient()
-  // Always use gemini-2.0-flash for scoring - do not allow overrides
-  const model = "gemini-2.0-flash"
-  return client.getGenerativeModel({ 
+  const model = (modelName ?? "").trim() || DEFAULT_MODEL
+  return client.getGenerativeModel({
     model,
     // Ensure we're using v1 API, not v1beta
   })
