@@ -9,8 +9,10 @@ const STREAM_HEADERS = {
   Connection: "keep-alive",
 }
 
+// "Sorry, AI chat is over the usage limit. Please try again in a few minutes."
 const RATE_LIMIT_FALLBACK_MESSAGE =
   "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+const RATE_LIMIT_FALLBACK_HEADER = "x-ai-fallback"
 
 export const maxDuration = 30
 
@@ -132,7 +134,9 @@ Essay: ${attachedTask?.essay ?? ""}`
         },
       })
 
-      return new Response(stream, { headers: { ...STREAM_HEADERS, "x-ai-fallback": "rate-limit" } })
+      return new Response(stream, {
+        headers: { ...STREAM_HEADERS, [RATE_LIMIT_FALLBACK_HEADER]: "rate-limit" },
+      })
     }
     
     return NextResponse.json({ 
