@@ -215,7 +215,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       // Update the revision with the improved essay
       await updateRevisionInTask(user.uid, taskId, revisionId, {
         improvedEssay: data.improvedEssay,
-        improvementExplanation: data.explanation || undefined,
+        improvementExplanation: data.explanation,
       })
 
       // Refresh task data

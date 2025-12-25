@@ -12,8 +12,11 @@ function hasStatus(error: unknown): error is { status: number } {
 
 // Helper to check if error has a response with status
 function hasResponseStatus(error: unknown): error is { response: { status: number } } {
-  return typeof error === 'object' && error !== null && 'response' in error &&
-         typeof (error as any).response === 'object' && 'status' in (error as any).response
+  if (typeof error !== 'object' || error === null || !('response' in error)) {
+    return false
+  }
+  const response = (error as { response: unknown }).response
+  return typeof response === 'object' && response !== null && 'status' in response
 }
 
 export async function POST(req: Request) {
@@ -130,25 +133,39 @@ Please generate an improved version of this essay that addresses all the issues 
     const text = response.text()
     
     // Parse JSON response
-    let improvedData
+    let improvedData: { improvedEssay: string; explanation: string }
     try {
-      // Try to extract JSON from the response
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        improvedData = JSON.parse(jsonMatch[0])
+      // Try parsing as JSON directly first
+      improvedData = JSON.parse(text)
+      
+      // Validate the parsed data has required fields
+      if (!improvedData.improvedEssay || typeof improvedData.improvedEssay !== 'string') {
+        throw new Error("Invalid response: missing improvedEssay")
+      }
+    } catch (parseError) {
+      console.error("[generate-improved-essay] JSON parse error:", parseError)
+      // Try to extract JSON from markdown code blocks or text
+      const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/) || text.match(/(\{[\s\S]*?\})/)
+      
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          improvedData = JSON.parse(jsonMatch[1])
+          if (!improvedData.improvedEssay || typeof improvedData.improvedEssay !== 'string') {
+            throw new Error("Invalid response")
+          }
+        } catch {
+          // Fallback: use the raw text as the improved essay
+          improvedData = {
+            improvedEssay: text,
+            explanation: "Essay improved based on feedback"
+          }
+        }
       } else {
-        // If no JSON found, treat the whole response as the improved essay
+        // Fallback: use the raw text as the improved essay
         improvedData = {
           improvedEssay: text,
           explanation: "Essay improved based on feedback"
         }
-      }
-    } catch (parseError) {
-      console.error("[generate-improved-essay] JSON parse error:", parseError)
-      // Fallback: use the raw text as the improved essay
-      improvedData = {
-        improvedEssay: text,
-        explanation: "Essay improved based on feedback"
       }
     }
 
