@@ -19,7 +19,7 @@ const DEFAULT_CONFIG: Required<RetryConfig> = {
 /**
  * Check if an error is retryable (429 Too Many Requests or quota errors)
  */
-function isRetryableError(error: any): boolean {
+export function isRetryableError(error: any): boolean {
   if (!error) return false
 
   // Check for 429 status code

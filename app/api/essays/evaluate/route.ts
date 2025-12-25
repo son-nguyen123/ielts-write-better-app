@@ -1,5 +1,6 @@
 import { getGeminiModel } from "@/lib/gemini-native"
-import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
+import { retryWithBackoff, GEMINI_RETRY_CONFIG, isRetryableError } from "@/lib/retry-utils"
+import { StatusError } from "@/lib/status-error"
 import { withRateLimit } from "@/lib/server-rate-limiter"
 import type { LineLevelFeedback, TaskFeedback } from "@/types/tasks"
 
@@ -111,8 +112,8 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       
       const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
       
-      if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
-        throw new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
+      if (isRetryableError(apiError)) {
+        throw new StatusError("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.", 429)
       }
       
       if (errorMsg.includes("API key")) {
@@ -172,15 +173,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
   } catch (error: any) {
     console.error("[evaluate] Error:", error)
     
-    const errorMessage = error?.message || error?.toString() || ""
-    const errorString = errorMessage.toLowerCase()
-    
-    const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
-      errorString.includes("resource_exhausted") ||
-      errorString.includes("too many requests") ||
-      (errorString.includes("rate limit") && !errorString.includes("unlimited"))
+    const isRateLimitError = isRetryableError(error)
     
     if (isRateLimitError) {
       return Response.json({ 
