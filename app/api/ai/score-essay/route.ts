@@ -138,6 +138,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       error?.response?.status === 429 ||
       errorString.includes("resource_exhausted") ||
       errorString.includes("too many requests") ||
+      errorString.includes("quota") ||
       (errorString.includes("rate limit") && !errorString.includes("unlimited"))
     
     if (isRateLimitError) {
