@@ -5,6 +5,8 @@ import { withRateLimit } from "@/lib/server-rate-limiter"
 import { z } from "zod"
 
 export const maxDuration = 30
+const RATE_LIMIT_FALLBACK_MESSAGE =
+  "AI tạo đề bài đang vượt giới hạn sử dụng (prompt generation is rate limited). Đã dùng bộ đề mẫu tạm thời, vui lòng thử lại sau vài phút để nhận đề mới."
 
 const promptSchema = z.object({
   prompts: z.array(
@@ -17,6 +19,12 @@ const promptSchema = z.object({
     })
   ),
 })
+
+type GeneratePromptsRequest = {
+  taskType?: "Task 1" | "Task 2" | "all" | null
+  topics?: string[]
+  count?: number
+}
 
 // Helper function to generate sample prompts when API is not available
 function generateSamplePrompts(taskType: string, topics: string[], count: number) {
@@ -93,13 +101,20 @@ function generateSamplePrompts(taskType: string, topics: string[], count: number
 }
 
 export async function POST(req: Request) {
+  let requestData: GeneratePromptsRequest | null = null
   try {
-    const { taskType, topics, count } = await req.json()
+    requestData = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid request body" }, { status: 400 })
+  }
 
-    const promptCount = count || 4
-    const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
-    const selectedTaskType = taskType || "all"
+  const { taskType, topics, count } = requestData || {}
+  const promptCount = count || 4
+  const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
+  const selectedTaskType: "Task 1" | "Task 2" | "all" =
+    taskType === "Task 1" || taskType === "Task 2" || taskType === "all" ? taskType : "all"
 
+  try {
     // Check if API key is available
     if (!process.env.GEMINI_API_KEY) {
       console.log("[v0] GEMINI_API_KEY not found, using sample prompts")
@@ -167,10 +182,12 @@ Ensure variety in:
       errorMessage.includes("429")
     
     if (isRateLimitError) {
-      return Response.json({ 
-        error: "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
+      const samplePrompts = generateSamplePrompts(selectedTaskType, selectedTopics, promptCount)
+      return Response.json({
+        prompts: samplePrompts,
+        fallback: true,
+        message: RATE_LIMIT_FALLBACK_MESSAGE,
+      })
     }
     
     return Response.json({ 
