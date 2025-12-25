@@ -3,6 +3,7 @@ import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 60
+const QUOTA_ERROR_PATTERN = /(resource_exhausted|quota exceeded|quota_exceeded|quota limit|api quota)/i
 
 export async function POST(req: Request) {
   try {
@@ -90,10 +91,6 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       // Detect specific error types
       const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
       
-      if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429")) {
-        throw new Error("API quota limit reached. Please wait a few minutes and try again. Free tier has limited requests per minute.")
-      }
-      
       if (errorMsg.includes("API key")) {
         throw new Error("API key configuration error. Please contact support.")
       }
@@ -136,8 +133,8 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorString.includes("resource_exhausted") ||
       errorString.includes("too many requests") ||
+      QUOTA_ERROR_PATTERN.test(errorString) ||
       (errorString.includes("rate limit") && !errorString.includes("unlimited"))
     
     if (isRateLimitError) {
