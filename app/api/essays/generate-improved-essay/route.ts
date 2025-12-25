@@ -1,6 +1,7 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import type { CriterionFeedback } from "@/types/tasks"
 
 export const maxDuration = 60
 
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
     
     if (feedback.criteria) {
       for (const [key, criterion] of Object.entries(feedback.criteria)) {
-        const crit = criterion as any
+        const crit = criterion as CriterionFeedback
         feedbackSummary += `${key} (Score: ${crit.score}):\n`
         if (crit.issues?.length > 0) {
           feedbackSummary += `Issues: ${crit.issues.join(', ')}\n`
