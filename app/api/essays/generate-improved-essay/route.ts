@@ -58,7 +58,8 @@ export async function POST(req: Request) {
       })
     }
 
-    const systemPrompt = `You are an expert IELTS writing tutor. Your task is to create an improved version of the student's essay that addresses all the identified issues while maintaining the student's core ideas and perspective.
+    // System prompt for AI to generate improved essays
+    const SYSTEM_PROMPT = `You are an expert IELTS writing tutor. Your task is to create an improved version of the student's essay that addresses all the identified issues while maintaining the student's core ideas and perspective.
 
 IMPORTANT GUIDELINES:
 1. Keep the same essay structure and main arguments as the original
@@ -98,7 +99,7 @@ Please generate an improved version of this essay that addresses all the issues 
             contents: [
               {
                 role: "user",
-                parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+                parts: [{ text: SYSTEM_PROMPT + "\n\n" + userPrompt }],
               },
             ],
             generationConfig: {
@@ -132,10 +133,14 @@ Please generate an improved version of this essay that addresses all the issues 
     const response = result.response
     const text = response.text()
     
-    // Parse JSON response
+    // Multi-stage JSON parsing strategy:
+    // 1. Direct JSON parse (cleanest response)
+    // 2. Extract from markdown code blocks if wrapped
+    // 3. Extract first JSON object from text
+    // 4. Fallback to raw text as essay content
     let improvedData: { improvedEssay: string; explanation: string }
     try {
-      // Try parsing as JSON directly first
+      // Stage 1: Try parsing response as direct JSON
       improvedData = JSON.parse(text)
       
       // Validate the parsed data has required fields
@@ -143,8 +148,8 @@ Please generate an improved version of this essay that addresses all the issues 
         throw new Error("Invalid response: missing improvedEssay")
       }
     } catch (parseError) {
-      console.error("[generate-improved-essay] JSON parse error:", parseError)
-      // Try to extract JSON from markdown code blocks or text
+      console.error("[generate-improved-essay] Direct JSON parse failed, trying extraction:", parseError)
+      // Stage 2 & 3: Extract JSON from markdown or find first JSON object
       const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/) || text.match(/(\{[\s\S]*?\})/)
       
       if (jsonMatch && jsonMatch[1]) {
@@ -154,14 +159,14 @@ Please generate an improved version of this essay that addresses all the issues 
             throw new Error("Invalid response")
           }
         } catch {
-          // Fallback: use the raw text as the improved essay
+          // Stage 4: Fallback - treat entire response as improved essay
           improvedData = {
             improvedEssay: text,
             explanation: "Essay improved based on feedback"
           }
         }
       } else {
-        // Fallback: use the raw text as the improved essay
+        // Stage 4: No JSON found - treat entire response as improved essay
         improvedData = {
           improvedEssay: text,
           explanation: "Essay improved based on feedback"

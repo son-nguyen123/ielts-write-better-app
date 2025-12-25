@@ -764,6 +764,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                             variant="ghost"
                                             size="icon"
                                             className="h-6 w-6"
+                                            aria-label="Sao chép bài mẫu cải thiện"
                                             onClick={() => {
                                               navigator.clipboard.writeText(revision.improvedEssay || "")
                                               toast({
