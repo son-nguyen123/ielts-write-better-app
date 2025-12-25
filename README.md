@@ -75,9 +75,9 @@ GEMINI_API_KEY=your_gemini_api_key
    - Copy the key and add it to your \`.env.local\` file
 
    **AI Model Information:**
-   - Default Gemini model is configurable via \`GEMINI_MODEL\` (defaults to \`gemini-1.5-flash\` for broad availability)
+   - Default Gemini model is configurable via \`GEMINI_MODEL\` (defaults to \`gemini-1.5-flash-latest\` on the v1 API)
    - Set \`GEMINI_MODEL\` to \`gemini-2.0-flash\` if your API key has access to that model
-   - Uses v1 API endpoint for content generation
+   - Uses the v1 API endpoint for content generation
 
 5. Uncomment Firebase code in:
    - \`lib/firebase.ts\`
