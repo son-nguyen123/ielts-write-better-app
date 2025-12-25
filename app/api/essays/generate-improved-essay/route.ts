@@ -19,12 +19,13 @@ export async function POST(req: Request) {
     
     if (feedback.criteria) {
       for (const [key, criterion] of Object.entries(feedback.criteria)) {
-        feedbackSummary += `${key} (Score: ${criterion.score}):\n`
-        if (criterion.issues?.length > 0) {
-          feedbackSummary += `Issues: ${criterion.issues.join(', ')}\n`
+        const crit = criterion as any
+        feedbackSummary += `${key} (Score: ${crit.score}):\n`
+        if (crit.issues?.length > 0) {
+          feedbackSummary += `Issues: ${crit.issues.join(', ')}\n`
         }
-        if (criterion.suggestions?.length > 0) {
-          feedbackSummary += `Suggestions: ${criterion.suggestions.join(', ')}\n`
+        if (crit.suggestions?.length > 0) {
+          feedbackSummary += `Suggestions: ${crit.suggestions.join(', ')}\n`
         }
       }
     }
@@ -113,7 +114,7 @@ Please generate an improved version of this essay that addresses all the issues 
       throw retryError
     }
 
-    const text = result.response.text()
+    const text = (result as any).response.text()
     
     // Parse JSON response
     let improvedData
