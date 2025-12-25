@@ -177,9 +177,11 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút.",
+        error: "⏱️ Hệ thống đang bận. API chấm điểm đã đạt giới hạn sử dụng miễn phí.\n\n" +
+               "🔄 Vui lòng đợi 2-3 phút rồi thử lại.\n\n" +
+               "💡 Mẹo: Bạn có thể lưu bản nháp trước để không mất nội dung.",
         errorType: "RATE_LIMIT",
-        retryAfter: 120
+        retryAfter: 180
       }, { status: 429 })
     }
     
