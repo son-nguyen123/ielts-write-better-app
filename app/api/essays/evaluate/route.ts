@@ -15,6 +15,7 @@ class StatusError extends Error {
 }
 
 function isQuotaErrorMessage(message: string) {
+  if (!message) return false
   const lower = message.toLowerCase()
   return (
     lower.includes("quota") ||
@@ -22,6 +23,16 @@ function isQuotaErrorMessage(message: string) {
     lower.includes("status 429") ||
     lower.includes("http 429") ||
     /\b429\b/.test(lower)
+  )
+}
+
+function isRateLimitMessage(message: string) {
+  if (!message) return false
+  const lower = message.toLowerCase()
+  return (
+    isQuotaErrorMessage(message) ||
+    lower.includes("too many requests") ||
+    (lower.includes("rate limit") && !lower.includes("unlimited"))
   )
 }
 
@@ -194,15 +205,10 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     console.error("[evaluate] Error:", error)
     
     const errorMessage = error?.message || error?.toString() || ""
-    const errorString = errorMessage.toLowerCase()
-    const isQuota = isQuotaErrorMessage(errorMessage)
-    
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorString.includes("too many requests") ||
-      isQuota ||
-      (errorString.includes("rate limit") && !errorString.includes("unlimited"))
+      isRateLimitMessage(errorMessage)
     
     if (isRateLimitError) {
       return Response.json({ 
