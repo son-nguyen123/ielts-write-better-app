@@ -93,13 +93,19 @@ function generateSamplePrompts(taskType: string, topics: string[], count: number
 }
 
 export async function POST(req: Request) {
+  let requestData: any
   try {
-    const { taskType, topics, count } = await req.json()
+    requestData = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid request body" }, { status: 400 })
+  }
 
-    const promptCount = count || 4
-    const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
-    const selectedTaskType = taskType || "all"
+  const { taskType, topics, count } = requestData
+  const promptCount = count || 4
+  const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
+  const selectedTaskType = taskType || "all"
 
+  try {
     // Check if API key is available
     if (!process.env.GEMINI_API_KEY) {
       console.log("[v0] GEMINI_API_KEY not found, using sample prompts")
@@ -167,10 +173,12 @@ Ensure variety in:
       errorMessage.includes("429")
     
     if (isRateLimitError) {
+      const samplePrompts = generateSamplePrompts(selectedTaskType, selectedTopics, promptCount)
       return Response.json({ 
-        error: "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
+        prompts: samplePrompts,
+        fallback: true,
+        message: "AI tạo đề bài đang vượt giới hạn sử dụng. Đã dùng bộ đề mẫu tạm thời, vui lòng thử lại sau vài phút để nhận đề mới."
+      })
     }
     
     return Response.json({ 

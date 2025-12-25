@@ -10,6 +10,13 @@ export const maxDuration = 60
  * based on the gap between current score and target score
  */
 export async function POST(req: NextRequest) {
+  let requestData: any
+  try {
+    requestData = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
   try {
     const { 
       submissionId,
@@ -18,7 +25,7 @@ export async function POST(req: NextRequest) {
       currentScore, 
       targetScore,
       keySuggestion 
-    } = await req.json()
+    } = requestData
 
     if (!submissionId || !weakestSkill || currentScore === undefined || targetScore === undefined) {
       return Response.json({ 
@@ -99,7 +106,7 @@ Suggest one specific exercise or technique the student can use immediately to pr
 
     return Response.json({
       submissionId,
-      submissionTitle,
+      submissionTitle: sanitizedTitle,
       weakestSkill,
       currentScore,
       targetScore,
@@ -109,13 +116,28 @@ Suggest one specific exercise or technique the student can use immediately to pr
     })
   } catch (error) {
     console.error("[analyze-submission-gap] Error:", error)
-    return Response.json(
-      { 
-        error: error instanceof Error ? error.message : "Failed to analyze submission gap",
-        details: error instanceof Error ? error.stack : undefined
-      },
-      { status: 500 }
-    )
+    const criterionName = getCriterionFullName(requestData?.weakestSkill || "")
+    const fallbackSuggestions = buildFallbackSuggestions({
+      submissionTitle: requestData?.submissionTitle,
+      weakestSkill: criterionName,
+      currentScore: requestData?.currentScore,
+      targetScore: requestData?.targetScore,
+      gap: (requestData?.targetScore ?? 0) - (requestData?.currentScore ?? 0),
+      keySuggestion: requestData?.keySuggestion
+    })
+
+    return Response.json({
+      submissionId: requestData?.submissionId,
+      submissionTitle: requestData?.submissionTitle || "Untitled",
+      weakestSkill: requestData?.weakestSkill,
+      currentScore: requestData?.currentScore,
+      targetScore: requestData?.targetScore,
+      gap: (requestData?.targetScore ?? 0) - (requestData?.currentScore ?? 0),
+      improvementSuggestions: fallbackSuggestions,
+      generatedAt: new Date().toISOString(),
+      fallback: true,
+      error: error instanceof Error ? error.message : "Failed to analyze submission gap"
+    })
   }
 }
 
@@ -127,4 +149,39 @@ function getCriterionFullName(criterion: string): string {
     GRA: "Grammar & Accuracy"
   }
   return names[criterion] || criterion
+}
+
+function buildFallbackSuggestions({
+  submissionTitle,
+  weakestSkill,
+  currentScore,
+  targetScore,
+  gap,
+  keySuggestion
+}: {
+  submissionTitle?: string
+  weakestSkill?: string
+  currentScore?: number
+  targetScore?: number
+  gap?: number
+  keySuggestion?: string
+}) {
+  const criterionName = weakestSkill || "your weakest criterion"
+  const safeCurrent = currentScore ?? 0
+  const safeTarget = targetScore ?? safeCurrent + (gap ?? 1)
+  const safeGap = gap ?? Math.max(0, safeTarget - safeCurrent)
+  const focusLine = keySuggestion ? `- Noted issue: ${keySuggestion}\n` : ""
+
+  return `### Quick improvement plan for ${criterionName}
+
+We couldn't generate an AI-powered analysis right now, so here is a concise plan to help you close the ${safeGap.toFixed(
+    1
+  )}-point gap from ${safeCurrent.toFixed(1)} to ${safeTarget.toFixed(1)}.
+
+${focusLine}- **What to improve:** Target ${criterionName.toLowerCase()} in your next drafts.
+- **Fixes to apply:** Simplify sentences, use clear topic sentences, and ensure every example links back to the question.
+- **Practice loop:** Revisit "${submissionTitle || "your latest submission"}", rewrite one paragraph focusing on ${criterionName.toLowerCase()}, and compare against band ${safeTarget.toFixed(
+    1
+  )} descriptors.
+- **Next step:** After rewriting, run the analysis again to get detailed AI feedback.`
 }
