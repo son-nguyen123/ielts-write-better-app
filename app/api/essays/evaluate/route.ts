@@ -1,19 +1,10 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG, isRetryableError } from "@/lib/retry-utils"
+import { StatusError } from "@/lib/status-error"
 import { withRateLimit } from "@/lib/server-rate-limiter"
 import type { LineLevelFeedback, TaskFeedback } from "@/types/tasks"
 
 export const maxDuration = 60
-
-class StatusError extends Error {
-  status?: number
-
-  constructor(message: string, status?: number) {
-    super(message)
-    this.name = "StatusError"
-    this.status = status
-  }
-}
 
 export async function POST(req: Request) {
   try {
