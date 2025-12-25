@@ -77,7 +77,7 @@ Essay: ${attachedTask?.essay ?? ""}`
       history: geminiMessages.slice(0, -1),
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 8192,
       },
       systemInstruction: {
         parts: [{ text: systemPrompt }],
