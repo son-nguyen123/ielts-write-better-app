@@ -9,13 +9,13 @@ export const maxDuration = 60
 
 export async function POST(req: Request) {
   try {
-    const { promptText, taskType, essayText, userId, promptId } = await req.json()
+    const { promptText, taskType, essayText, userId, promptId, model: selectedModel } = await req.json()
 
     if (!essayText || !taskType) {
       return Response.json({ error: "Missing required fields: essayText and taskType" }, { status: 400 })
     }
 
-    const model = getGeminiModel()
+    const model = getGeminiModel(selectedModel)
 
     const systemPrompt = `You are an expert IELTS examiner. Evaluate the following ${taskType} essay according to official IELTS criteria:
 

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useGeminiModels } from "@/hooks/use-gemini-models"
 import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
@@ -60,6 +61,7 @@ export function NewTaskForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState<AIGeneratedPrompt | null>(null)
+  const { modelOptions, selectedModel, setSelectedModel, modelError } = useGeminiModels()
 
   // Load AI-generated prompt from sessionStorage on mount
   useEffect(() => {
@@ -143,6 +145,7 @@ export function NewTaskForm() {
           promptText: resolvedPrompt,
           userId: user.uid,
           promptId: selectedPrompt || null,
+          model: selectedModel || undefined,
         }),
       })
 
@@ -236,6 +239,23 @@ export function NewTaskForm() {
                   <SelectItem value="Task 2">Task 2 (Essay)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Gemini Model for Scoring</Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelOptions.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={modelError ?? "Select a model"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {modelError && <p className="text-xs text-destructive">{modelError}</p>}
             </div>
 
             <div className="space-y-2">
