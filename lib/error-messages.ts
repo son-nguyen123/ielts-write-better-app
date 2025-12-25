@@ -7,8 +7,8 @@ export const ERROR_MESSAGES = {
   RATE_LIMIT: {
     TITLE: "⏱️ Hệ thống đang bận",
     MESSAGE: 
-      "⏱️ Hệ thống đang bận. API chấm điểm đã đạt giới hạn sử dụng miễn phí.\n\n" +
-      "🔄 Vui lòng đợi 2-3 phút rồi thử lại.\n\n" +
+      "⏱️ Hệ thống đang bận. API chấm điểm đã đạt giới hạn sử dụng miễn phí.|" +
+      "🔄 Vui lòng đợi 2-3 phút rồi thử lại.|" +
       "💡 Mẹo: Bạn có thể lưu bản nháp trước để không mất nội dung.",
     RETRY_AFTER_SECONDS: 180,
   },
