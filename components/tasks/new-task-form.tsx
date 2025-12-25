@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
+import { ERROR_MESSAGES } from "@/lib/error-messages"
 import type { TaskFeedback } from "@/types/tasks"
 
 import {
@@ -151,15 +152,18 @@ export function NewTaskForm() {
         // Check for rate limit errors
         let errorTitle = "Lỗi chấm điểm"
         let errorMessage = data?.error || "Không thể chấm điểm bài viết. Vui lòng thử lại."
+        let duration = 5000
         
         if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
-          errorTitle = "Hệ thống đang bận"
-          errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút."
+          errorTitle = ERROR_MESSAGES.RATE_LIMIT.TITLE
+          errorMessage = data?.error || ERROR_MESSAGES.RATE_LIMIT.MESSAGE
+          duration = 10000 // Show longer for rate limit errors
         }
         
         const error: any = new Error(errorMessage)
         error.title = errorTitle
         error.retryable = scoringResponse.status === 429
+        error.duration = duration
         throw error
       }
 
@@ -195,14 +199,14 @@ export function NewTaskForm() {
       
       // Add helpful suggestion for rate limit errors
       if (error?.retryable) {
-        errorDescription += "\n\nGợi ý: Bạn có thể lưu bản nháp và thử lại sau, hoặc đợi một chút rồi nhấn gửi lại."
+        errorDescription += "\n\n💾 Gợi ý: Lưu bản nháp ngay để không mất nội dung, sau đó thử lại sau 2-3 phút."
       }
       
       toast({
         title: error?.title || "Lỗi",
         description: errorDescription,
         variant: "destructive",
-        duration: 7000, // Show longer for rate limit errors
+        duration: error?.duration || 7000, // Use custom duration if provided
       })
     } finally {
       setIsSubmitting(false)

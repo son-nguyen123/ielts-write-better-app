@@ -40,6 +40,10 @@ class ServerRateLimiter {
       }
 
       this.queue.push(request)
+      // Log only in development to avoid production noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Request queued. Queue length: ${this.queue.length}, Active: ${this.activeRequests}`)
+      }
       this.processQueue()
     })
   }
@@ -50,6 +54,9 @@ class ServerRateLimiter {
   private async processQueue() {
     // Can't process if at max concurrent requests
     if (this.activeRequests >= this.config.maxConcurrent) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Max concurrent requests reached (${this.activeRequests}/${this.config.maxConcurrent})`)
+      }
       return
     }
 
@@ -57,8 +64,12 @@ class ServerRateLimiter {
     const now = Date.now()
     const timeSinceLastRequest = now - this.lastRequestTime
     if (timeSinceLastRequest < this.config.minInterval && this.lastRequestTime > 0) {
+      const waitTime = this.config.minInterval - timeSinceLastRequest
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Rate limiting: waiting ${waitTime}ms before next request`)
+      }
       // Schedule next processing after minimum interval
-      setTimeout(() => this.processQueue(), this.config.minInterval - timeSinceLastRequest)
+      setTimeout(() => this.processQueue(), waitTime)
       return
     }
 
@@ -69,6 +80,9 @@ class ServerRateLimiter {
 
     this.activeRequests++
     this.lastRequestTime = Date.now()
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[RateLimiter] Processing request. Active: ${this.activeRequests}, Queue: ${this.queue.length}`)
+    }
 
     try {
       const result = await request.fn()
@@ -77,6 +91,9 @@ class ServerRateLimiter {
       request.reject(error)
     } finally {
       this.activeRequests--
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[RateLimiter] Request completed. Active: ${this.activeRequests}, Queue: ${this.queue.length}`)
+      }
       
       // Process next request after minimum interval
       if (this.queue.length > 0) {
@@ -101,18 +118,18 @@ let geminiRateLimiter: ServerRateLimiter | null = null
 
 /**
  * Get or create the global Gemini rate limiter
- * Conservative settings to avoid hitting quota limits:
+ * Very conservative settings to avoid hitting quota limits on free tier:
  * - Max 1 concurrent request
- * - Minimum 4 seconds between requests (15 RPM max)
+ * - Minimum 8 seconds between requests (~7 RPM max)
  * 
- * Note: gemini-2.0-flash-exp has higher limits than pro models,
- * but we keep conservative settings to ensure stability
+ * Note: Free tier Gemini API has 15 RPM limit, but we use 8s interval
+ * to provide safety margin and account for processing time variance
  */
 export function getGeminiRateLimiter(): ServerRateLimiter {
   if (!geminiRateLimiter) {
     geminiRateLimiter = new ServerRateLimiter({
       maxConcurrent: 1,
-      minInterval: 4000, // 4 seconds = max 15 requests per minute (conservative for stability)
+      minInterval: 8000, // 8 seconds = max ~7 requests per minute (very conservative for free tier stability)
     })
   }
   return geminiRateLimiter

@@ -1,6 +1,7 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { ERROR_MESSAGES } from "@/lib/error-messages"
 
 export const maxDuration = 60
 const QUOTA_ERROR_PATTERN = /(resource_exhausted|quota exceeded|quota_exceeded|quota limit|api quota)/i
@@ -92,7 +93,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       const errorMsg = apiError instanceof Error ? apiError.message : String(apiError)
       
       if (errorMsg.includes("API key")) {
-        throw new Error("API key configuration error. Please contact support.")
+        throw new Error(ERROR_MESSAGES.API_KEY.MESSAGE)
       }
       
       // Re-throw for general error handler
@@ -139,15 +140,15 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     
     if (isRateLimitError) {
       return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút.",
+        error: ERROR_MESSAGES.RATE_LIMIT.MESSAGE,
         errorType: "RATE_LIMIT",
-        retryAfter: 120 // Suggest retry after 2 minutes
+        retryAfter: ERROR_MESSAGES.RATE_LIMIT.RETRY_AFTER_SECONDS
       }, { status: 429 })
     }
     
     // Generic error
     return Response.json({ 
-      error: error instanceof Error ? error.message : "Không thể chấm điểm bài viết. Vui lòng kiểm tra kết nối và thử lại.",
+      error: error instanceof Error ? error.message : ERROR_MESSAGES.GENERIC.MESSAGE,
       errorType: "GENERIC"
     }, { status: 500 })
   }

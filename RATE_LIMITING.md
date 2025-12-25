@@ -21,20 +21,19 @@ Even if your usage dashboard shows you're not hitting limits, you can still get 
 
 We implement a **global server-side request queue** that ensures:
 - **Max 1 concurrent request** - Only one AI request runs at a time
-- **Minimum 4 seconds between requests** - Ensures max ~15 RPM (conservative for stability)
+- **Minimum 8 seconds between requests** - Ensures max ~7 RPM (very conservative for free tier)
 - **FIFO queue processing** - Requests are processed in order
 
-This prevents request bursts and ensures smooth quota usage with a safety margin.
+This prevents request bursts and ensures smooth quota usage with a large safety margin for free tier users.
 
 ### 2. Conservative Retry Configuration (`lib/retry-utils.ts`)
 
-Updated retry settings for optimal quota usage:
-- **Max 1 retry** (reduced from 3) - Minimize API calls, fail faster
-- **5-second initial delay** - Give time for quota reset
-- **10-second max delay** (reduced from 30s) - Faster failure detection
-- **2x backoff multiplier** - Standard exponential backoff
+Updated retry settings for optimal quota usage on free tier:
+- **Max 0 retries** - No retries, fail fast to preserve quota
+- **8-second initial delay** - Match rate limiter interval
+- **15-second max delay** - Quick failure detection
 
-With these settings, a single request can make at most 2 API calls (1 initial + 1 retry), reducing quota consumption significantly.
+With these settings, a single request makes only 1 API call with no retries, significantly reducing quota consumption and avoiding rate limit errors.
 
 ### 3. All API Routes Updated
 
@@ -81,10 +80,10 @@ Better error messages in Vietnamese:
 
 ```
 Request A arrives → Process immediately (activeRequests: 1)
-Request B arrives → Queue (waiting for 4s interval)
-Request A completes after 2s → Wait 2s more
-After 4s total → Process Request B
-Request C arrives → Queue behind B
+Request B arrives → Queue (waiting for 8s interval)
+Request A completes after 2s → Wait 6s more
+After 8s total → Process Request B
+Request C arrives → Queue behind B (must wait 8s after B starts)
 ```
 
 ## Configuration Tuning
@@ -98,20 +97,20 @@ export function getGeminiRateLimiter(): ServerRateLimiter {
   if (!geminiRateLimiter) {
     geminiRateLimiter = new ServerRateLimiter({
       maxConcurrent: 1,
-      minInterval: 5000, // Change from 4000 to 5000 (12 RPM max)
+      minInterval: 10000, // Change from 8000 to 10000 (6 RPM max) if still getting errors
     })
   }
   return geminiRateLimiter
 }
 ```
 
-### Reduce retry attempts
+### Enable retry attempts (not recommended for free tier)
 ```typescript
 // In lib/retry-utils.ts
 export const GEMINI_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 0, // Change from 1 to 0 (no retries, fail immediately)
-  initialDelayMs: 5000,
-  maxDelayMs: 10000,
+  maxRetries: 1, // Change from 0 to 1 if you have paid tier with higher limits
+  initialDelayMs: 8000,
+  maxDelayMs: 15000,
   backoffMultiplier: 2,
 }
 ```
@@ -121,7 +120,11 @@ export const GEMINI_RETRY_CONFIG: RetryConfig = {
 ### Check Logs
 Server logs will show:
 ```
-[Retry] Rate limit hit. Retry #1/1 after 5000ms
+[RateLimiter] Request queued. Queue length: 2, Active: 1
+[RateLimiter] Rate limiting: waiting 3000ms before next request
+[RateLimiter] Processing request. Active: 1, Queue: 1
+[RateLimiter] Request completed. Active: 0, Queue: 1
+[Retry] Rate limit hit. Retry #0/0 after 8000ms (with 0 retries configured)
 [score-essay] Raw error details: { status: 429, responseStatus: ..., responseData: ..., message: "...", timestamp: "..." }
 ```
 
@@ -181,19 +184,19 @@ Server logs will show:
 
 This is expected! With rate limiting:
 - First request: Immediate
-- Second request: 4+ seconds wait
-- Third request: 4+ seconds wait
+- Second request: 8+ seconds wait
+- Third request: 8+ seconds wait
 - etc.
 
-This is intentional to prevent quota exhaustion.
+This is intentional to prevent quota exhaustion on free tier.
 
 ## Summary
 
 The rate limiting implementation ensures:
 ✅ No simultaneous API calls  
-✅ Minimum 4s between requests (15 RPM max)
-✅ Minimal retry strategy (1 retry max)
+✅ Minimum 8s between requests (~7 RPM max, very conservative for free tier)  
+✅ No retry strategy (0 retries to preserve quota)
 ✅ Better error detection and logging
 ✅ Detailed logging for debugging  
 
-This should significantly reduce quota exceeded errors while providing a stable user experience.
+This should significantly reduce quota exceeded errors while providing a stable user experience on free tier. If you have a paid tier with higher limits, you can adjust the settings as described above.
