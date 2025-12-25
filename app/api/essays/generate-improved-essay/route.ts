@@ -97,11 +97,11 @@ Please generate an improved version of this essay that addresses all the issues 
           GEMINI_RETRY_CONFIG
         )
       )
-    } catch (retryError: any) {
+    } catch (retryError: unknown) {
       console.error("[generate-improved-essay] Retry failed:", retryError)
-      const errorMessage = retryError?.message || retryError?.toString() || ""
+      const errorMessage = retryError instanceof Error ? retryError.message : String(retryError)
       const isRateLimitError = 
-        retryError?.status === 429 ||
+        (retryError as any)?.status === 429 ||
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("rate limit")
       
@@ -146,13 +146,13 @@ Please generate an improved version of this essay that addresses all the issues 
       explanation: improvedData.explanation || "Essay improved to address identified issues and achieve a higher band score."
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[generate-improved-essay] Error:", error)
     
-    const errorMessage = error?.message || error?.toString() || ""
+    const errorMessage = error instanceof Error ? error.message : String(error)
     const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
+      (error as any)?.status === 429 ||
+      (error as any)?.response?.status === 429 ||
       errorMessage.toLowerCase().includes("too many requests") ||
       errorMessage.toLowerCase().includes("quota") ||
       errorMessage.toLowerCase().includes("rate limit") ||

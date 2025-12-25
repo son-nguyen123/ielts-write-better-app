@@ -208,14 +208,14 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
       const data = await res.json()
 
-      if (!res.ok) {
+      if (!res.ok || !data?.improvedEssay) {
         throw new Error(data?.error || "Failed to generate improved essay")
       }
 
       // Update the revision with the improved essay
       await updateRevisionInTask(user.uid, taskId, revisionId, {
         improvedEssay: data.improvedEssay,
-        improvementExplanation: data.explanation,
+        improvementExplanation: data.explanation || undefined,
       })
 
       // Refresh task data

@@ -111,7 +111,12 @@ export async function addRevisionToTask(userId: string, taskId: string, revision
   })
 }
 
-export async function updateRevisionInTask(userId: string, taskId: string, revisionId: string, updates: Partial<{ improvedEssay: string; improvementExplanation: string }>) {
+export async function updateRevisionInTask(
+  userId: string, 
+  taskId: string, 
+  revisionId: string, 
+  updates: Pick<Revision, 'improvedEssay' | 'improvementExplanation'>
+) {
   const taskRef = doc(db, "users", userId, "tasks", taskId)
   const taskDoc = await getDoc(taskRef)
   
