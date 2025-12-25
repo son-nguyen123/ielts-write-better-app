@@ -9,10 +9,13 @@ const STREAM_HEADERS = {
   Connection: "keep-alive",
 }
 
-// "Sorry, AI chat is over the usage limit. Please try again in a few minutes."
+// Vietnamese message shown to users when Gemini is rate limited.
+// English translation: "Sorry, AI chat is over the usage limit. Please try again in a few minutes."
 const RATE_LIMIT_FALLBACK_MESSAGE =
   "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+// Signals to clients that the response is a synthetic fallback rather than a real Gemini reply.
 const RATE_LIMIT_FALLBACK_HEADER = "x-ai-fallback"
+const RATE_LIMIT_FALLBACK_VALUE = "rate-limit"
 
 export const maxDuration = 30
 
@@ -134,9 +137,12 @@ Essay: ${attachedTask?.essay ?? ""}`
         },
       })
 
-      return new Response(stream, {
-        headers: { ...STREAM_HEADERS, [RATE_LIMIT_FALLBACK_HEADER]: "rate-limit" },
-      })
+      const fallbackHeaders = {
+        ...STREAM_HEADERS,
+        [RATE_LIMIT_FALLBACK_HEADER]: RATE_LIMIT_FALLBACK_VALUE,
+      }
+
+      return new Response(stream, { headers: fallbackHeaders })
     }
     
     return NextResponse.json({ 
