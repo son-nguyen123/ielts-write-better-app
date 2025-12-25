@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useGeminiModels } from "@/hooks/use-gemini-models"
 import { Loader2, Save, Send } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { createTask } from "@/lib/firebase-firestore"
@@ -47,12 +48,6 @@ type AIGeneratedPrompt = {
   tags: string[]
 }
 
-interface GeminiModelOption {
-  id: string
-  displayName: string
-  description?: string
-}
-
 export function NewTaskForm() {
   const router = useRouter()
   const { toast } = useToast()
@@ -66,9 +61,7 @@ export function NewTaskForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState<AIGeneratedPrompt | null>(null)
-  const [modelOptions, setModelOptions] = useState<GeminiModelOption[]>([])
-  const [selectedModel, setSelectedModel] = useState<string>("")
-  const [modelError, setModelError] = useState<string | null>(null)
+  const { modelOptions, selectedModel, setSelectedModel, modelError } = useGeminiModels()
 
   // Load AI-generated prompt from sessionStorage on mount
   useEffect(() => {
@@ -87,32 +80,6 @@ export function NewTaskForm() {
         console.error("Failed to parse stored prompt:", error)
       }
     }
-  }, [])
-
-  // Fetch available models
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response = await fetch("/api/ai/models")
-
-        if (!response.ok) {
-          const { error } = await response.json().catch(() => ({ error: "" }))
-          throw new Error(error || "Failed to load Gemini models")
-        }
-
-        const data = await response.json()
-        const options: GeminiModelOption[] = data.models ?? []
-
-        setModelOptions(options)
-        setSelectedModel(data.defaultModelId ?? options[0]?.id ?? "")
-        setModelError(null)
-      } catch (error) {
-        console.error("Failed to load Gemini models", error)
-        setModelError(error instanceof Error ? error.message : "Failed to load Gemini models")
-      }
-    }
-
-    fetchModels()
   }, [])
 
   const prompts = taskType === "Task 1" ? task1Prompts : task2Prompts

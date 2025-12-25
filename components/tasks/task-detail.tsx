@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Copy, GitCompare, CheckCircle2, AlertCircle, Loader2, RefreshCw, Edit, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useGeminiModels } from "@/hooks/use-gemini-models"
 import { useAuth } from "@/components/auth/auth-provider"
 import { getTask, addRevisionToTask } from "@/lib/firebase-firestore"
 import type { CriterionKey, TaskDocument, TaskFeedback, LineLevelFeedback } from "@/types/tasks"
@@ -26,12 +27,6 @@ interface TaskDetailProps {
   taskId: string
 }
 
-interface GeminiModelOption {
-  id: string
-  displayName: string
-  description?: string
-}
-
 export function TaskDetail({ taskId }: TaskDetailProps) {
   const { toast } = useToast()
   const { user, loading: authLoading } = useAuth()
@@ -46,9 +41,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const [highlightedFeedback, setHighlightedFeedback] = useState<LineLevelFeedback | null>(null)
   const [improvementRequests, setImprovementRequests] = useState<Record<string, any>>({})
   const [loadingImprovements, setLoadingImprovements] = useState<Record<string, boolean>>({})
-  const [modelOptions, setModelOptions] = useState<GeminiModelOption[]>([])
-  const [selectedModel, setSelectedModel] = useState<string>("")
-  const [modelError, setModelError] = useState<string | null>(null)
+  const { modelOptions, selectedModel, setSelectedModel, modelError } = useGeminiModels()
 
   useEffect(() => {
     let isMounted = true
@@ -95,32 +88,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
       isMounted = false
     }
   }, [authLoading, taskId, user])
-
-  // Fetch available models
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response = await fetch("/api/ai/models")
-
-        if (!response.ok) {
-          const { error } = await response.json().catch(() => ({ error: "" }))
-          throw new Error(error || "Failed to load Gemini models")
-        }
-
-        const data = await response.json()
-        const options: GeminiModelOption[] = data.models ?? []
-
-        setModelOptions(options)
-        setSelectedModel(data.defaultModelId ?? options[0]?.id ?? "")
-        setModelError(null)
-      } catch (error) {
-        console.error("Failed to load Gemini models", error)
-        setModelError(error instanceof Error ? error.message : "Failed to load Gemini models")
-      }
-    }
-
-    fetchModels()
-  }, [])
 
   const handleRevaluate = async () => {
     if (!user || !task) return
