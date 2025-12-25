@@ -200,14 +200,36 @@ export function NewTaskForm() {
       // Provide more helpful error messages
       let errorDescription = error?.message || "Không thể gửi nhiệm vụ. Vui lòng thử lại."
       
-      // Add helpful suggestion for rate limit errors
-      if (error?.retryable) {
-        errorDescription += "\n\n💾 Gợi ý: Lưu bản nháp ngay để không mất nội dung, sau đó thử lại sau 2-3 phút."
+      // Format error message for display - convert pipe-separated lines to JSX
+      // Messages from ERROR_MESSAGES.RATE_LIMIT use "|" as line separator
+      const formatErrorMessage = (msg: string) => {
+        if (msg.includes("|")) {
+          const lines = msg.split("|").map(line => line.trim())
+          return (
+            <div className="space-y-2">
+              {lines.map((line, idx) => (
+                <div key={idx}>{line}</div>
+              ))}
+            </div>
+          )
+        }
+        // Handle legacy \n\n format as well
+        if (msg.includes("\n\n")) {
+          const lines = msg.split("\n\n").map(line => line.trim())
+          return (
+            <div className="space-y-2">
+              {lines.map((line, idx) => (
+                <div key={idx}>{line}</div>
+              ))}
+            </div>
+          )
+        }
+        return msg
       }
       
       toast({
         title: error?.title || "Lỗi",
-        description: errorDescription,
+        description: formatErrorMessage(errorDescription),
         variant: "destructive",
         duration: error?.duration || 7000, // Use custom duration if provided
       })
