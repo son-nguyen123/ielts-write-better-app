@@ -226,11 +226,12 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         title: "Bài mẫu đã sẵn sàng",
         description: "Đã tạo bài viết cải thiện dựa trên phản hồi.",
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[v0] Failed to generate improved essay:", error)
+      const errorMessage = error instanceof Error ? error.message : "Vui lòng thử lại sau."
       toast({
         title: "Không thể tạo bài mẫu",
-        description: error.message || "Vui lòng thử lại sau.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

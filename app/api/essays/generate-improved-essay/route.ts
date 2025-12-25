@@ -5,6 +5,17 @@ import type { CriterionFeedback, LineLevelFeedback } from "@/types/tasks"
 
 export const maxDuration = 60
 
+// Helper to check if error has a status property
+function hasStatus(error: unknown): error is { status: number } {
+  return typeof error === 'object' && error !== null && 'status' in error
+}
+
+// Helper to check if error has a response with status
+function hasResponseStatus(error: unknown): error is { response: { status: number } } {
+  return typeof error === 'object' && error !== null && 'response' in error &&
+         typeof (error as any).response === 'object' && 'status' in (error as any).response
+}
+
 export async function POST(req: Request) {
   try {
     const { originalEssay, feedback, prompt, taskType } = await req.json()
@@ -101,7 +112,7 @@ Please generate an improved version of this essay that addresses all the issues 
       console.error("[generate-improved-essay] Retry failed:", retryError)
       const errorMessage = retryError instanceof Error ? retryError.message : String(retryError)
       const isRateLimitError = 
-        (retryError as any)?.status === 429 ||
+        hasStatus(retryError) && retryError.status === 429 ||
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("rate limit")
       
@@ -151,8 +162,8 @@ Please generate an improved version of this essay that addresses all the issues 
     
     const errorMessage = error instanceof Error ? error.message : String(error)
     const isRateLimitError = 
-      (error as any)?.status === 429 ||
-      (error as any)?.response?.status === 429 ||
+      (hasStatus(error) && error.status === 429) ||
+      (hasResponseStatus(error) && error.response.status === 429) ||
       errorMessage.toLowerCase().includes("too many requests") ||
       errorMessage.toLowerCase().includes("quota") ||
       errorMessage.toLowerCase().includes("rate limit") ||
