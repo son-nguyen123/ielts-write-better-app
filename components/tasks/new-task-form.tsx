@@ -224,7 +224,7 @@ export function NewTaskForm() {
             </div>
           )
         }
-        return errorDescription
+        return msg
       }
       
       toast({
