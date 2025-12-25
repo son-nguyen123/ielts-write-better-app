@@ -12,7 +12,7 @@ import {
   Timestamp,
   onSnapshot,
 } from "firebase/firestore"
-import type { TaskDocument } from "@/types/tasks"
+import type { TaskDocument, Revision } from "@/types/tasks"
 import { db } from "./firebase"
 
 // Tasks
@@ -122,7 +122,7 @@ export async function updateRevisionInTask(userId: string, taskId: string, revis
   const taskData = taskDoc.data()
   const existingRevisions = taskData.revisions || []
   
-  const updatedRevisions = existingRevisions.map((rev: any) => {
+  const updatedRevisions = existingRevisions.map((rev: Revision) => {
     if (rev.id === revisionId) {
       return { ...rev, ...updates }
     }

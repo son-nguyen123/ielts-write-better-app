@@ -1,7 +1,7 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
-import type { CriterionFeedback } from "@/types/tasks"
+import type { CriterionFeedback, LineLevelFeedback } from "@/types/tasks"
 
 export const maxDuration = 60
 
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     // Add line-level feedback details
     if (feedback.lineLevelFeedback && feedback.lineLevelFeedback.length > 0) {
       feedbackSummary += `\nDetailed Errors:\n`
-      feedback.lineLevelFeedback.forEach((item: any, index: number) => {
+      feedback.lineLevelFeedback.forEach((item: LineLevelFeedback, index: number) => {
         const excerpt = originalEssay.substring(item.startIndex, item.endIndex)
         feedbackSummary += `${index + 1}. "${excerpt}" - ${item.comment}`
         if (item.suggestedRewrite) {
@@ -115,7 +115,8 @@ Please generate an improved version of this essay that addresses all the issues 
       throw retryError
     }
 
-    const text = (result as any).response.text()
+    const response = result.response
+    const text = response.text()
     
     // Parse JSON response
     let improvedData
