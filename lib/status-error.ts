@@ -3,6 +3,9 @@ export class StatusError extends Error {
 
   constructor(message: string, status?: number) {
     super(message)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, StatusError)
+    }
     this.name = "StatusError"
     this.status = status
   }

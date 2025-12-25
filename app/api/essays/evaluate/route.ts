@@ -173,10 +173,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
   } catch (error: any) {
     console.error("[evaluate] Error:", error)
     
-    const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
-      isRetryableError(error)
+    const isRateLimitError = isRetryableError(error)
     
     if (isRateLimitError) {
       return Response.json({ 
