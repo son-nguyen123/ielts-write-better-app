@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
-import { createMissingApiKeyResponse } from "@/lib/error-utils"
+import { createMissingApiKeyResponse, createDiagnosticErrorResponse, diagnoseError } from "@/lib/error-utils"
 
 export const maxDuration = 30
 
@@ -98,32 +98,26 @@ Essay: ${attachedTask?.essay ?? ""}`
     })
   } catch (err: any) {
     console.error("[/api/ai/chat] error:", err?.stack || err?.message || err)
-    console.error("[/api/ai/chat] Error details:", {
-      status: err?.status,
-      message: err?.message,
-      timestamp: new Date().toISOString(),
+    
+    // Diagnose error with detailed information
+    const diagnostics = diagnoseError(err)
+    
+    // Log detailed diagnostic information
+    console.error("[/api/ai/chat] Diagnostic information:", {
+      errorType: diagnostics.errorType,
+      statusCode: diagnostics.statusCode,
+      message: diagnostics.message,
+      isCodeIssue: diagnostics.isCodeIssue,
+      isApiIssue: diagnostics.isApiIssue,
+      possibleCauses: diagnostics.possibleCauses,
+      timestamp: diagnostics.timestamp,
     })
     
-    // Check for rate limit / quota errors
-    const errorMessage = err?.message || err?.toString() || ""
-    const isRateLimitError = 
-      err?.status === 429 ||
-      err?.response?.status === 429 ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorMessage.toLowerCase().includes("quota") ||
-      errorMessage.toLowerCase().includes("rate limit") ||
-      errorMessage.includes("429")
+    // Create diagnostic response
+    const diagnosticResponse = createDiagnosticErrorResponse(err)
     
-    if (isRateLimitError) {
-      return NextResponse.json({ 
-        error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
-    }
-    
-    return NextResponse.json({ 
-      error: err?.message ?? "Failed to process chat",
-      errorType: "GENERIC"
-    }, { status: 500 })
+    // Return with appropriate status code
+    const statusCode = diagnostics.statusCode || 500
+    return NextResponse.json(diagnosticResponse, { status: statusCode })
   }
 }

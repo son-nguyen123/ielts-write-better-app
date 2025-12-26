@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createMissingApiKeyResponse } from "@/lib/error-utils"
+import { createMissingApiKeyResponse, createDiagnosticErrorResponse, diagnoseError } from "@/lib/error-utils"
 
 const GEMINI_MODELS_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models"
 
@@ -27,9 +27,23 @@ export async function GET() {
     if (!response.ok) {
       const errorBody = await response.text()
       console.error("[GET /api/ai/models] Failed to list models", response.status, errorBody)
+      
+      // Create error object for diagnosis
+      const error = new Error(`Failed to fetch models: ${errorBody}`)
+      ;(error as any).status = response.status
+      ;(error as any).responseData = errorBody
+      
+      const diagnostics = diagnoseError(error)
+      console.error("[models] Diagnostic information:", {
+        errorType: diagnostics.errorType,
+        statusCode: diagnostics.statusCode,
+        isCodeIssue: diagnostics.isCodeIssue,
+        isApiIssue: diagnostics.isApiIssue,
+      })
+      
       return NextResponse.json(
-        { error: "Failed to fetch Gemini models" },
-        { status: response.status === 404 ? 404 : 502 },
+        createDiagnosticErrorResponse(error),
+        { status: diagnostics.statusCode || 502 },
       )
     }
 
@@ -61,11 +75,23 @@ export async function GET() {
     const defaultModelId = models.find((model) => model.id.includes("flash"))?.id ?? models[0]?.id
 
     return NextResponse.json({ models, defaultModelId })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[GET /api/ai/models] Unexpected error", error)
+    
+    // Diagnose error with detailed information
+    const diagnostics = diagnoseError(error)
+    
+    console.error("[models] Diagnostic information:", {
+      errorType: diagnostics.errorType,
+      statusCode: diagnostics.statusCode,
+      isCodeIssue: diagnostics.isCodeIssue,
+      isApiIssue: diagnostics.isApiIssue,
+      timestamp: diagnostics.timestamp,
+    })
+    
     return NextResponse.json(
-      { error: "Failed to fetch Gemini models" },
-      { status: 500 },
+      createDiagnosticErrorResponse(error),
+      { status: diagnostics.statusCode || 500 },
     )
   }
 }

@@ -1,7 +1,7 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
-import { isMissingApiKeyError, createMissingApiKeyResponse } from "@/lib/error-utils"
+import { createDiagnosticErrorResponse, diagnoseError } from "@/lib/error-utils"
 
 export const maxDuration = 60
 
@@ -114,45 +114,31 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
   } catch (error: any) {
     console.error("[score-essay] Error:", error)
     
-    // Log detailed error information for debugging
-    console.error("[score-essay] Raw error details:", {
-      status: error?.status,
-      responseStatus: error?.response?.status,
-      responseData: error?.response?.data,
-      message: error?.message,
-      timestamp: new Date().toISOString(),
+    // Diagnose error with detailed information
+    const diagnostics = diagnoseError(error)
+    
+    // Log detailed diagnostic information for debugging
+    console.error("[score-essay] Diagnostic information:", {
+      errorType: diagnostics.errorType,
+      statusCode: diagnostics.statusCode,
+      message: diagnostics.message,
+      isCodeIssue: diagnostics.isCodeIssue,
+      isApiIssue: diagnostics.isApiIssue,
+      possibleCauses: diagnostics.possibleCauses,
+      timestamp: diagnostics.timestamp,
+      rawError: {
+        status: error?.status,
+        responseStatus: error?.response?.status,
+        message: error?.message,
+      }
     })
     
-    // Check for rate limit / quota errors with more precise detection
-    const errorMessage = error?.message || error?.toString() || ""
-    const errorString = errorMessage.toLowerCase()
+    // Create diagnostic response
+    const diagnosticResponse = createDiagnosticErrorResponse(error)
     
-    // Check if it's a missing API key error
-    if (isMissingApiKeyError(errorMessage)) {
-      return Response.json(createMissingApiKeyResponse(), { status: 500 })
-    }
-    
-    // More precise rate limit detection - avoid false positives
-    const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
-      errorString.includes("resource_exhausted") ||
-      errorString.includes("too many requests") ||
-      (errorString.includes("rate limit") && !errorString.includes("unlimited"))
-    
-    if (isRateLimitError) {
-      return Response.json({ 
-        error: "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút.",
-        errorType: "RATE_LIMIT",
-        retryAfter: 120 // Suggest retry after 2 minutes
-      }, { status: 429 })
-    }
-    
-    // Generic error
-    return Response.json({ 
-      error: error instanceof Error ? error.message : "Không thể chấm điểm bài viết. Vui lòng kiểm tra kết nối và thử lại.",
-      errorType: "GENERIC"
-    }, { status: 500 })
+    // Return with appropriate status code
+    const statusCode = diagnostics.statusCode || 500
+    return Response.json(diagnosticResponse, { status: statusCode })
   }
 }
 
