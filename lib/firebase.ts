@@ -53,16 +53,17 @@ let initializationError: Error | undefined
 function getApp(): FirebaseApp {
   if (!app && !initializationError) {
     try {
+      // Only initialize if properly configured
+      if (!isFirebaseConfigured) {
+        initializationError = getFirebaseConfigError()
+        throw initializationError
+      }
+      
       // Check if Firebase is already initialized
       const existingApps = getApps()
       if (existingApps.length > 0) {
         app = existingApps[0]
       } else {
-        // Only initialize if properly configured
-        if (!isFirebaseConfigured) {
-          initializationError = getFirebaseConfigError()
-          throw initializationError
-        }
         app = initializeApp(firebaseConfig)
       }
     } catch (error) {
@@ -85,6 +86,10 @@ let _storage: FirebaseStorage | undefined
 
 export const auth: Auth = new Proxy({} as Auth, {
   get(target, prop) {
+    // Check if Firebase is configured before attempting to use it
+    if (!isFirebaseConfigured) {
+      throw getFirebaseConfigError()
+    }
     if (!_auth) {
       _auth = getAuth(getApp())
     }
@@ -94,6 +99,10 @@ export const auth: Auth = new Proxy({} as Auth, {
 
 export const db: Firestore = new Proxy({} as Firestore, {
   get(target, prop) {
+    // Check if Firebase is configured before attempting to use it
+    if (!isFirebaseConfigured) {
+      throw getFirebaseConfigError()
+    }
     if (!_db) {
       _db = getFirestore(getApp())
     }
@@ -103,6 +112,10 @@ export const db: Firestore = new Proxy({} as Firestore, {
 
 export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
   get(target, prop) {
+    // Check if Firebase is configured before attempting to use it
+    if (!isFirebaseConfigured) {
+      throw getFirebaseConfigError()
+    }
     if (!_storage) {
       _storage = getStorage(getApp())
     }
