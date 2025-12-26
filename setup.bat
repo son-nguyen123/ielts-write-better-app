@@ -58,7 +58,7 @@ echo # Get your key at: https://aistudio.google.com/app/apikey
 echo GEMINI_API_KEY=!API_KEY!
 echo.
 echo # =============================================================================
-echo # FIREBASE CONFIGURATION (Optional^)
+echo # FIREBASE CONFIGURATION - Optional
 echo # =============================================================================
 echo # Uncomment and fill these if you want to use Firebase features
 echo # NEXT_PUBLIC_FIREBASE_API_KEY=

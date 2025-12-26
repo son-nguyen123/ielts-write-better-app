@@ -213,11 +213,15 @@ export function NewTaskForm() {
         errorDescription += "\n\nGợi ý: Bạn có thể lưu bản nháp và thử lại sau, hoặc đợi một chút rồi nhấn gửi lại."
       }
       
+      // Determine duration based on error type
+      const toastDuration = error?.title?.includes("API Key") ? 10000 : 
+                           error?.retryable ? 7000 : 5000
+      
       toast({
         title: error?.title || "Lỗi",
         description: errorDescription,
         variant: "destructive",
-        duration: 7000, // Show longer for rate limit errors
+        duration: toastDuration,
       })
     } finally {
       setIsSubmitting(false)

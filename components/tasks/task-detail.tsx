@@ -95,8 +95,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         }),
       })
 
-      const data = await response.json()
-
       const data = await response.json().catch(() => null)
       
       if (!response.ok || !data?.feedback) {
