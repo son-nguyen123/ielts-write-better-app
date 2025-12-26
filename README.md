@@ -12,7 +12,7 @@ An AI-powered IELTS writing improvement application built with Next.js, featurin
   - Essay planner for structured outlines
   - Paraphrase tool with multiple style options
   - Grammar checker with detailed explanations
-- **AI Chatbot**: Get instant help and feedback on your writing
+- **AI Chatbot**: Get instant help and feedback on your writing ([Setup Guide](./CHAT_SETUP_GUIDE.md))
 - **Progress Reports**: Track your improvement over time with detailed analytics
 - **User Profiles**: Customize your learning goals and preferences
 
@@ -75,9 +75,11 @@ GEMINI_API_KEY=your_gemini_api_key
    - Copy the key and add it to your \`.env.local\` file
 
    **AI Model Information:**
-   - The essay scoring system uses \`gemini-2.0-flash\` model exclusively
-   - The model is hardcoded to ensure consistent and reliable IELTS evaluations
-   - Uses v1 API endpoint: \`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent\`
+   - The essay scoring system uses \`gemini-2.0-flash-exp\` model (experimental version with higher rate limits)
+   - For chat functionality, the model can be selected by users or defaults to the experimental version
+   - Fallback models are available if the primary model is unavailable
+   - Uses v1 API endpoint: \`https://generativelanguage.googleapis.com/v1/models/*\`
+   - For chat setup and troubleshooting, see [Chat Setup Guide](./CHAT_SETUP_GUIDE.md)
 
 5. Uncomment Firebase code in:
    - \`lib/firebase.ts\`
