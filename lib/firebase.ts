@@ -14,6 +14,7 @@ const firebaseConfig = {
 }
 
 // Validate Firebase configuration
+// Note: measurementId is optional (only required for Google Analytics)
 const requiredEnvVars = [
   'NEXT_PUBLIC_FIREBASE_API_KEY',
   'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',

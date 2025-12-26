@@ -192,7 +192,8 @@ If you encounter a 403 error when trying to sign in with Firebase (e.g., `identi
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
    NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
-   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+   # Optional: Only needed for Google Analytics
+   # NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
    \`\`\`
 
 2. **Restart Development Server**: After adding or modifying environment variables, restart your development server:
