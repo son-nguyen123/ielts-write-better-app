@@ -3,18 +3,7 @@ import { getAuth, Auth } from "firebase/auth"
 import { getFirestore, Firestore } from "firebase/firestore"
 import { getStorage, FirebaseStorage } from "firebase/storage"
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-}
-
-// Validate Firebase configuration
-// Note: measurementId is optional (only required for Google Analytics)
+// Check if Firebase environment variables are configured
 const requiredEnvVars = [
   'NEXT_PUBLIC_FIREBASE_API_KEY',
   'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
@@ -24,36 +13,69 @@ const requiredEnvVars = [
   'NEXT_PUBLIC_FIREBASE_APP_ID',
 ]
 
-function validateFirebaseConfig() {
+function checkFirebaseConfig(): { isConfigured: boolean; missingVars: string[] } {
   const missingEnvVars = requiredEnvVars.filter(
     (envVar) => !process.env[envVar]
   )
-
-  if (missingEnvVars.length > 0) {
-    throw new Error(
-      `Missing required Firebase environment variables: ${missingEnvVars.join(', ')}. ` +
-      'Please check your .env.local file and ensure all required variables are set. ' +
-      'See .env.example for the required configuration.'
-    )
+  return {
+    isConfigured: missingEnvVars.length === 0,
+    missingVars: missingEnvVars
   }
+}
+
+const configCheck = checkFirebaseConfig()
+const isFirebaseConfigured = configCheck.isConfigured
+
+// Use placeholder values if environment variables are not set
+// This allows the app to build and run without Firebase configuration
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "placeholder-api-key",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "placeholder.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "placeholder-project",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "placeholder.appspot.com",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:000000000000:web:0000000000000000000000",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+}
+
+function getFirebaseConfigError(): Error {
+  return new Error(
+    `Firebase is not configured. Missing required environment variables: ${configCheck.missingVars.join(', ')}. ` +
+    'Please check your .env.local file and ensure all required variables are set. ' +
+    'See .env.example for the required configuration.'
+  )
 }
 
 // Lazy initialization of Firebase app
 let app: FirebaseApp | undefined
+let initializationError: Error | undefined
+
 function getApp(): FirebaseApp {
-  if (!app) {
-    // Validate config before initializing
-    validateFirebaseConfig()
-    
-    // Check if Firebase is already initialized
-    const existingApps = getApps()
-    if (existingApps.length > 0) {
-      app = existingApps[0]
-    } else {
-      app = initializeApp(firebaseConfig)
+  if (!app && !initializationError) {
+    try {
+      // Check if Firebase is already initialized
+      const existingApps = getApps()
+      if (existingApps.length > 0) {
+        app = existingApps[0]
+      } else {
+        // Only initialize if properly configured
+        if (!isFirebaseConfigured) {
+          initializationError = getFirebaseConfigError()
+          throw initializationError
+        }
+        app = initializeApp(firebaseConfig)
+      }
+    } catch (error) {
+      initializationError = error as Error
+      throw error
     }
   }
-  return app
+  
+  if (initializationError) {
+    throw initializationError
+  }
+  
+  return app!
 }
 
 // Lazy getters for Firebase services
@@ -87,3 +109,6 @@ export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
     return Reflect.get(_storage, prop)
   }
 })
+
+// Export configuration status for use in components
+export { isFirebaseConfigured }
