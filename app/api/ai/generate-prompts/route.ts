@@ -169,10 +169,11 @@ Ensure variety in:
       timestamp: diagnostics.timestamp,
     })
     
-    // Check for rate limit errors and fallback to sample prompts
+    // Check for rate limit/quota errors and fallback to sample prompts
+    // isRateLimitError checks for both rate limits (RPM) and quota exceeded (RPD)
     if (isRateLimitError(error)) {
-      // Fallback to sample prompts when rate limit is hit
-      console.log("[v0] Rate limit hit, falling back to sample prompts")
+      // Fallback to sample prompts when API limits are hit
+      console.log("[v0] API limit hit, falling back to sample prompts")
       const samplePrompts = generateSamplePrompts("all", ["general"], 6)
       return Response.json({ 
         prompts: samplePrompts,

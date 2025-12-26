@@ -97,7 +97,7 @@ export function isQuotaExceededError(error: any): boolean {
     errorString.includes("rpd") ||
     errorString.includes("daily limit") ||
     errorString.includes("monthly limit") ||
-    errorString.includes("billing") && errorString.includes("limit")
+    (errorString.includes("billing") && errorString.includes("limit"))
   )
 }
 
@@ -195,7 +195,7 @@ export function diagnoseError(error: any): ErrorDiagnostics {
     return {
       errorType: ErrorType.QUOTA_EXCEEDED,
       statusCode: statusCode || 429,
-      message: "API quota limit exceeded (RPM, RPD, or monthly limit reached)",
+      message: "API quota limit exceeded (RPM: Requests Per Minute, RPD: Requests Per Day, or monthly limit reached)",
       vietnameseMessage: "Đã vượt giới hạn quota API (RPM: requests per minute, RPD: requests per day). Đây là vấn đề về giới hạn API, không phải code.",
       possibleCauses: [
         "Free tier RPM limit reached (e.g., 5 requests/minute)",
@@ -404,6 +404,9 @@ export function formatRateLimitMessage(): string {
 
 /**
  * Format detailed diagnostic message for client display
+ * Note: This function formats ErrorDiagnostics objects directly.
+ * For formatting API error responses, see formatErrorResponse() in chat-interface.tsx
+ * which handles the raw error data structure from API responses.
  */
 export function formatDiagnosticMessage(diagnostics: ErrorDiagnostics): string {
   const causeOrIssue = diagnostics.isCodeIssue ? "Vấn đề Code" : diagnostics.isApiIssue ? "Vấn đề API" : "Vấn đề Chưa Rõ"
