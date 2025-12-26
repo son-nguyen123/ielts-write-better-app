@@ -25,8 +25,10 @@ Created a `.env.local` file in the project root with the provided GEMINI_API_KEY
 ### Configuration
 The `.env.local` file includes:
 ```env
-GEMINI_API_KEY=AIzaSyAalMlE8AWdtfY2yoQd-bNwYPF07Q35C-k
+GEMINI_API_KEY=your_actual_gemini_api_key_here
 ```
+
+Replace `your_actual_gemini_api_key_here` with your actual Gemini API key obtained from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 ### Security Notes
 - The `.env.local` file is automatically excluded from git via `.gitignore`
@@ -35,7 +37,7 @@ GEMINI_API_KEY=AIzaSyAalMlE8AWdtfY2yoQd-bNwYPF07Q35C-k
 
 ## Verification
 1. ✓ `.env.local` file created successfully
-2. ✓ API key is properly formatted (starts with 'AIzaSy', 39 characters)
+2. ✓ API key is properly formatted (valid Google AI Studio API key format)
 3. ✓ File is ignored by git (not tracked)
 4. ✓ Application builds successfully
 5. ✓ Dev server starts and loads the environment file
