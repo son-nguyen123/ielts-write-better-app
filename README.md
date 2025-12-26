@@ -73,6 +73,8 @@ GEMINI_API_KEY=your_gemini_api_key
    - Sign in with your Google account
    - Click "Create API Key"
    - Copy the key and add it to your \`.env.local\` file
+   
+   **🇻🇳 Hướng dẫn tiếng Việt:** Xem [HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md](./HƯỚNG_DẪN_THAY_ĐỔI_API_KEY.md) để biết chi tiết cách thay đổi API key
 
    **AI Model Information:**
    - Default Gemini model is configurable via \`GEMINI_MODEL\` (defaults to \`gemini-2.0-flash\` on the v1 API)
