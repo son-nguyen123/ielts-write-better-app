@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createMissingApiKeyResponse } from "@/lib/error-utils"
 
 const GEMINI_MODELS_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models"
 
@@ -14,10 +15,7 @@ export async function GET() {
   const apiKey = process.env.GEMINI_API_KEY
 
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "Missing GEMINI_API_KEY in environment" },
-      { status: 500 },
-    )
+    return NextResponse.json(createMissingApiKeyResponse(), { status: 500 })
   }
 
   try {

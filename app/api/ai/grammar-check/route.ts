@@ -2,6 +2,7 @@ import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { isMissingApiKeyError, createMissingApiKeyResponse } from "@/lib/error-utils"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -57,12 +58,19 @@ Focus on: subject-verb agreement, tense consistency, article usage, prepositions
     
     // Check for rate limit / quota errors
     const errorMessage = error?.message || error?.toString() || ""
+    const errorString = errorMessage.toLowerCase()
+    
+    // Check if it's a missing API key error
+    if (isMissingApiKeyError(errorMessage)) {
+      return Response.json(createMissingApiKeyResponse(), { status: 500 })
+    }
+    
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorMessage.toLowerCase().includes("quota") ||
-      errorMessage.toLowerCase().includes("rate limit") ||
+      errorString.includes("too many requests") ||
+      errorString.includes("quota") ||
+      errorString.includes("rate limit") ||
       errorMessage.includes("429")
     
     if (isRateLimitError) {

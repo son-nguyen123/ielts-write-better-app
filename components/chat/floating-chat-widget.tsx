@@ -13,6 +13,7 @@ import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Spar
 import { useAuth } from "@/components/auth/auth-provider"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
+import { formatMissingApiKeyMessage, formatRateLimitMessage, isMissingApiKeyError } from "@/lib/error-utils"
 
 interface Message {
   role: "user" | "assistant"
@@ -34,6 +35,23 @@ interface ScoredEssay {
   overallBand: number
   feedback: any
   updatedAt: any
+}
+
+// Helper function to determine error type and format message
+function getErrorMessage(error: unknown): string {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  const isRateLimitError = 
+    errorMessage.toLowerCase().includes("vượt giới hạn") ||
+    errorMessage.toLowerCase().includes("rate limit") ||
+    errorMessage.toLowerCase().includes("quota") ||
+    errorMessage.toLowerCase().includes("too many requests")
+  
+  if (isMissingApiKeyError(errorMessage)) {
+    return formatMissingApiKeyMessage()
+  } else if (isRateLimitError) {
+    return formatRateLimitMessage()
+  }
+  return "Sorry, I encountered an error. Please try again."
 }
 
 export function FloatingChatWidget() {
@@ -58,8 +76,18 @@ export function FloatingChatWidget() {
         const response = await fetch("/api/ai/models")
 
         if (!response.ok) {
-          const { error } = await response.json().catch(() => ({ error: "" }))
-          throw new Error(error || "Failed to load Gemini models")
+          const errorData = await response.json().catch(() => ({ error: "" }))
+          
+          // Check if it's a missing API key error
+          if (errorData.errorType === "MISSING_API_KEY" || errorData.setupInstructions) {
+            throw new Error(
+              `⚠️ API Key Not Configured\n\n${errorData.message || "Missing GEMINI_API_KEY in environment"}\n\n` +
+              `Setup: ${errorData.setupInstructions || "Configure your .env.local file"}\n\n` +
+              `Get your API key at: ${errorData.docsUrl || "https://aistudio.google.com/app/apikey"}`
+            )
+          }
+          
+          throw new Error(errorData.error || "Failed to load Gemini models")
         }
 
         const data = await response.json()
@@ -172,18 +200,7 @@ export function FloatingChatWidget() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      const isRateLimitError = 
-        errorMessage.toLowerCase().includes("vượt giới hạn") ||
-        errorMessage.toLowerCase().includes("rate limit") ||
-        errorMessage.toLowerCase().includes("quota") ||
-        errorMessage.toLowerCase().includes("too many requests")
-      
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
-      
+      const responseMessage = getErrorMessage(error)
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: responseMessage },
@@ -256,18 +273,7 @@ export function FloatingChatWidget() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      const isRateLimitError = 
-        errorMessage.toLowerCase().includes("vượt giới hạn") ||
-        errorMessage.toLowerCase().includes("rate limit") ||
-        errorMessage.toLowerCase().includes("quota") ||
-        errorMessage.toLowerCase().includes("too many requests")
-      
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
-      
+      const responseMessage = getErrorMessage(error)
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: responseMessage },

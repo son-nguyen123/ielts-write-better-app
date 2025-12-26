@@ -1,6 +1,7 @@
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { isMissingApiKeyError, createMissingApiKeyResponse } from "@/lib/error-utils"
 
 export const maxDuration = 60
 
@@ -125,6 +126,11 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
     // Check for rate limit / quota errors with more precise detection
     const errorMessage = error?.message || error?.toString() || ""
     const errorString = errorMessage.toLowerCase()
+    
+    // Check if it's a missing API key error
+    if (isMissingApiKeyError(errorMessage)) {
+      return Response.json(createMissingApiKeyResponse(), { status: 500 })
+    }
     
     // More precise rate limit detection - avoid false positives
     const isRateLimitError = 
