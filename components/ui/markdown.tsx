@@ -71,6 +71,7 @@ export function Markdown({ content, className = "" }: MarkdownProps) {
       <ReactMarkdown 
         remarkPlugins={[remarkGfm]}
         components={components}
+        skipHtml={true}
       >
         {content}
       </ReactMarkdown>
