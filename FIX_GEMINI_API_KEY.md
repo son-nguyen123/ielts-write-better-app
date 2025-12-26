@@ -1,5 +1,7 @@
 # Fix for GEMINI_API_KEY Configuration Issue
 
+> **Summary**: This document describes how to resolve the "Missing GEMINI_API_KEY in environment" error by properly configuring the environment variables required for the application to communicate with Google's Gemini API.
+
 ## Problem
 The application was failing with the following errors:
 - `Error: Missing GEMINI_API_KEY in environment`
@@ -28,7 +30,7 @@ The `.env.local` file includes:
 GEMINI_API_KEY=your_actual_gemini_api_key_here
 ```
 
-Replace `your_actual_gemini_api_key_here` with your actual Gemini API key obtained from [Google AI Studio](https://aistudio.google.com/app/apikey).
+Replace `your_actual_gemini_api_key_here` with your actual Gemini API key obtained from [Google AI Studio](https://aistudio.google.com/apikey).
 
 ### Security Notes
 - The `.env.local` file is automatically excluded from git via `.gitignore`
