@@ -13,7 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Markdown } from "@/components/ui/markdown"
-import { formatMissingApiKeyMessage, formatRateLimitMessage, isMissingApiKeyError, formatDiagnosticMessage, type ErrorDiagnostics } from "@/lib/error-utils"
+import { formatMissingApiKeyMessage, formatRateLimitMessage, isMissingApiKeyError } from "@/lib/error-utils"
 
 interface Message {
   role: "user" | "assistant"
