@@ -178,6 +178,43 @@ service cloud.firestore {
 3. Add environment variables in Vercel dashboard
 4. Deploy
 
+## Troubleshooting
+
+### Firebase 403 Authentication Error
+
+If you encounter a 403 error when trying to sign in with Firebase (e.g., `identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=...:1 Failed to load resource: the server responded with a status of 403`), this typically means:
+
+1. **Missing Environment Variables**: Make sure you have created a `.env.local` file with all required Firebase environment variables:
+   \`\`\`env
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+   NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
+   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+   \`\`\`
+
+2. **Restart Development Server**: After adding or modifying environment variables, restart your development server:
+   \`\`\`bash
+   # Stop the server (Ctrl+C) and restart
+   npm run dev
+   \`\`\`
+
+3. **Firebase Project Configuration**: Verify your Firebase project settings:
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Select your project
+   - Go to Project Settings > General
+   - Under "Your apps", find your web app and copy the config values
+   - Ensure Authentication is enabled (Authentication > Sign-in method)
+   - Enable Email/Password and Google sign-in methods
+
+4. **API Key Restrictions**: Check if your Firebase API key has restrictions:
+   - In Firebase Console, go to Google Cloud Console
+   - Navigate to APIs & Services > Credentials
+   - Find your API key and check if there are any restrictions
+   - For development, you may need to allow requests from `localhost`
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -185,4 +222,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License.
-\`\`\`
