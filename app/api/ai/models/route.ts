@@ -87,10 +87,11 @@ export async function GET() {
     }
 
     // Prefer experimental flash model for better rate limits
+    // Priority: exact match for 2.0-flash-exp > contains "flash" > first available
     const defaultModelId = models.find((model) => 
-      model.id.includes("2.0-flash-exp")
+      model.id === "gemini-2.0-flash-exp"
     )?.id ?? models.find((model) => 
-      model.id.includes("flash")
+      model.id.startsWith("gemini-") && model.id.includes("flash")
     )?.id ?? models[0]?.id
 
     return NextResponse.json({ models, defaultModelId })

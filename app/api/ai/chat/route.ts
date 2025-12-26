@@ -5,6 +5,9 @@ import { withRateLimit } from "@/lib/server-rate-limiter"
 
 export const maxDuration = 30
 
+// Default model with higher rate limits
+const DEFAULT_CHAT_MODEL = "gemini-2.0-flash-exp"
+
 export async function POST(req: Request) {
   try {
     const json = await req.json().catch(() => null)
@@ -51,7 +54,7 @@ Essay: ${attachedTask?.essay ?? ""}`
     }))
 
     // Use experimental model for better rate limits, or user-selected model
-    const modelName = typeof model === "string" && model.trim() ? model : "gemini-2.0-flash-exp"
+    const modelName = typeof model === "string" && model.trim() ? model : DEFAULT_CHAT_MODEL
     const geminiModel = getGeminiModel(modelName)
 
     const chat = geminiModel.startChat({

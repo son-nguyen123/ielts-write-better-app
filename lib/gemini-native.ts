@@ -19,7 +19,6 @@ export function getGeminiClient() {
  * Priority order:
  * 1. Provided modelName (if valid)
  * 2. gemini-2.0-flash-exp (experimental version with higher limits)
- * 3. gemini-1.5-flash (stable fallback)
  */
 export function getGeminiModel(modelName?: string) {
   const client = getGeminiClient()

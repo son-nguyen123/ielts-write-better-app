@@ -36,6 +36,10 @@ interface ScoredEssay {
   updatedAt: any
 }
 
+interface ChatError extends Error {
+  errorType?: "RATE_LIMIT" | "AUTH_ERROR" | "GENERIC"
+}
+
 export function ChatInterface() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -173,7 +177,8 @@ export function ChatInterface() {
       
       // Check if it's a rate limit error
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const errorType = (error as any)?.errorType || "GENERIC"
+      const chatError = error as ChatError
+      const errorType = chatError?.errorType || "GENERIC"
       
       const isRateLimitError = 
         errorType === "RATE_LIMIT" ||
@@ -270,7 +275,8 @@ export function ChatInterface() {
       console.error("[v0] Error in chat:", error)
       
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const errorType = (error as any)?.errorType || "GENERIC"
+      const chatError = error as ChatError
+      const errorType = chatError?.errorType || "GENERIC"
       
       const isRateLimitError = 
         errorType === "RATE_LIMIT" ||
