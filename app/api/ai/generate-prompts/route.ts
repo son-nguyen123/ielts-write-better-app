@@ -93,13 +93,13 @@ function generateSamplePrompts(taskType: string, topics: string[], count: number
 }
 
 export async function POST(req: Request) {
-  // Parse request body once
-  const { taskType, topics, count } = await req.json()
-  const promptCount = count || 4
-  const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
-  const selectedTaskType = taskType || "all"
-
   try {
+    // Parse request body once
+    const { taskType, topics, count } = await req.json()
+    const promptCount = count || 4
+    const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
+    const selectedTaskType = taskType || "all"
+
     // Check if API key is available
     if (!process.env.GEMINI_API_KEY) {
       console.log("[v0] GEMINI_API_KEY not found, using sample prompts")
@@ -168,8 +168,9 @@ Ensure variety in:
     
     if (isRateLimitError) {
       // Fallback to sample prompts when rate limit is hit
+      // Use default values since we may not have parsed request body yet
       console.log("[v0] Rate limit hit, falling back to sample prompts")
-      const samplePrompts = generateSamplePrompts(selectedTaskType, selectedTopics, promptCount)
+      const samplePrompts = generateSamplePrompts("all", ["general"], 6)
       return Response.json({ 
         prompts: samplePrompts,
         usingSampleData: true,
