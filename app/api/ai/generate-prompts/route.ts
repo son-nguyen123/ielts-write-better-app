@@ -2,6 +2,7 @@ import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { createDiagnosticErrorResponse, diagnoseError, isRateLimitError } from "@/lib/error-utils"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -156,31 +157,40 @@ Ensure variety in:
   } catch (error: any) {
     console.error("[v0] Error generating prompts:", error)
     
-    // Check for rate limit / quota errors
-    const errorMessage = error?.message || error?.toString() || ""
-    const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorMessage.toLowerCase().includes("quota") ||
-      errorMessage.toLowerCase().includes("rate limit") ||
-      errorMessage.includes("429")
+    // Diagnose error with detailed information
+    const diagnostics = diagnoseError(error)
     
-    if (isRateLimitError) {
+    // Log detailed diagnostic information
+    console.error("[generate-prompts] Diagnostic information:", {
+      errorType: diagnostics.errorType,
+      statusCode: diagnostics.statusCode,
+      isCodeIssue: diagnostics.isCodeIssue,
+      isApiIssue: diagnostics.isApiIssue,
+      timestamp: diagnostics.timestamp,
+    })
+    
+    // Check for rate limit errors and fallback to sample prompts
+    if (isRateLimitError(error)) {
       // Fallback to sample prompts when rate limit is hit
-      // Use default values since we may not have parsed request body yet
       console.log("[v0] Rate limit hit, falling back to sample prompts")
       const samplePrompts = generateSamplePrompts("all", ["general"], 6)
       return Response.json({ 
         prompts: samplePrompts,
         usingSampleData: true,
-        message: "Đang sử dụng đề bài mẫu do giới hạn API. Các đề bài vẫn phù hợp để luyện tập."
+        message: "Đang sử dụng đề bài mẫu do giới hạn API. Các đề bài vẫn phù hợp để luyện tập.",
+        diagnostics: {
+          errorType: diagnostics.errorType,
+          vietnameseMessage: diagnostics.vietnameseMessage,
+          isApiIssue: diagnostics.isApiIssue,
+        }
       })
     }
     
-    return Response.json({ 
-      error: "Failed to generate prompts",
-      errorType: "GENERIC"
-    }, { status: 500 })
+    // Create diagnostic response for other errors
+    const diagnosticResponse = createDiagnosticErrorResponse(error)
+    
+    // Return with appropriate status code
+    const statusCode = diagnostics.statusCode || 500
+    return Response.json(diagnosticResponse, { status: statusCode })
   }
 }

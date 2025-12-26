@@ -13,7 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Markdown } from "@/components/ui/markdown"
-import { formatMissingApiKeyMessage, formatRateLimitMessage, isMissingApiKeyError } from "@/lib/error-utils"
+import { formatMissingApiKeyMessage, formatRateLimitMessage, isMissingApiKeyError, formatDiagnosticMessage, type ErrorDiagnostics } from "@/lib/error-utils"
 
 interface Message {
   role: "user" | "assistant"
@@ -37,9 +37,32 @@ interface ScoredEssay {
   updatedAt: any
 }
 
-// Helper function to determine error type and format message
-function getErrorMessage(error: unknown): string {
-  const errorMessage = error instanceof Error ? error.message : String(error)
+// Helper function to format error response with diagnostics
+function formatErrorResponse(errorData: any): string {
+  // Check if we have diagnostic information
+  if (errorData.diagnostics) {
+    const diag = errorData.diagnostics
+    const header = `🔍 **Chẩn đoán lỗi:**\n\n`
+    const type = diag.isCodeIssue ? "⚙️ **Vấn đề Code**" : diag.isApiIssue ? "🌐 **Vấn đề API**" : "❓ **Vấn đề Chưa Rõ**"
+    const message = `\n**Thông báo:** ${errorData.vietnameseMessage || errorData.error}\n`
+    
+    let causes = ""
+    if (diag.possibleCauses && diag.possibleCauses.length > 0) {
+      causes = `\n**Nguyên nhân có thể:**\n${diag.possibleCauses.map((c: string, i: number) => `${i + 1}. ${c}`).join('\n')}\n`
+    }
+    
+    let steps = ""
+    if (diag.troubleshootingSteps && diag.troubleshootingSteps.length > 0) {
+      steps = `\n**Cách khắc phục:**\n${diag.troubleshootingSteps.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}\n`
+    }
+    
+    const timestamp = diag.timestamp ? `\n**Thời gian:** ${new Date(diag.timestamp).toLocaleString('vi-VN')}` : ""
+    
+    return header + type + message + causes + steps + timestamp
+  }
+  
+  // Fallback to simple error message
+  const errorMessage = errorData.error || errorData.message || String(errorData)
   const isRateLimitError = 
     errorMessage.toLowerCase().includes("vượt giới hạn") ||
     errorMessage.toLowerCase().includes("rate limit") ||
@@ -51,7 +74,7 @@ function getErrorMessage(error: unknown): string {
   } else if (isRateLimitError) {
     return formatRateLimitMessage()
   }
-  return "Sorry, I encountered an error. Please try again."
+  return errorMessage || "Sorry, I encountered an error. Please try again."
 }
 
 export function ChatInterface() {
@@ -78,16 +101,9 @@ export function ChatInterface() {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: "" }))
           
-          // Check if it's a missing API key error
-          if (errorData.errorType === "MISSING_API_KEY" || errorData.setupInstructions) {
-            throw new Error(
-              `⚠️ API Key Not Configured\n\n${errorData.message || "Missing GEMINI_API_KEY in environment"}\n\n` +
-              `Setup: ${errorData.setupInstructions || "Configure your .env.local file"}\n\n` +
-              `Get your API key at: ${errorData.docsUrl || "https://aistudio.google.com/app/apikey"}`
-            )
-          }
-          
-          throw new Error(errorData.error || "Failed to load Gemini models")
+          // Format error with diagnostics if available
+          const formattedError = formatErrorResponse(errorData)
+          throw new Error(formattedError)
         }
 
         const data = await response.json()
@@ -198,7 +214,7 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      const responseMessage = getErrorMessage(error)
+      const responseMessage = error instanceof Error ? error.message : formatErrorResponse(error)
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: responseMessage },
@@ -271,7 +287,7 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      const responseMessage = getErrorMessage(error)
+      const responseMessage = error instanceof Error ? error.message : formatErrorResponse(error)
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: responseMessage },

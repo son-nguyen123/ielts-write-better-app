@@ -2,7 +2,7 @@ import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
-import { isMissingApiKeyError, createMissingApiKeyResponse } from "@/lib/error-utils"
+import { createDiagnosticErrorResponse, diagnoseError } from "@/lib/error-utils"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -54,33 +54,23 @@ Each paraphrase should maintain the original meaning while demonstrating the spe
   } catch (error: any) {
     console.error("[v0] Error generating paraphrases:", error)
     
-    // Check for rate limit / quota errors
-    const errorMessage = error?.message || error?.toString() || ""
-    const errorString = errorMessage.toLowerCase()
+    // Diagnose error with detailed information
+    const diagnostics = diagnoseError(error)
     
-    // Check if it's a missing API key error
-    if (isMissingApiKeyError(errorMessage)) {
-      return Response.json(createMissingApiKeyResponse(), { status: 500 })
-    }
+    // Log detailed diagnostic information
+    console.error("[paraphrase] Diagnostic information:", {
+      errorType: diagnostics.errorType,
+      statusCode: diagnostics.statusCode,
+      isCodeIssue: diagnostics.isCodeIssue,
+      isApiIssue: diagnostics.isApiIssue,
+      timestamp: diagnostics.timestamp,
+    })
     
-    const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
-      errorString.includes("too many requests") ||
-      errorString.includes("quota") ||
-      errorString.includes("rate limit") ||
-      errorMessage.includes("429")
+    // Create diagnostic response
+    const diagnosticResponse = createDiagnosticErrorResponse(error)
     
-    if (isRateLimitError) {
-      return Response.json({ 
-        error: "AI diễn giải đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
-    }
-    
-    return Response.json({ 
-      error: "Failed to generate paraphrases",
-      errorType: "GENERIC"
-    }, { status: 500 })
+    // Return with appropriate status code
+    const statusCode = diagnostics.statusCode || 500
+    return Response.json(diagnosticResponse, { status: statusCode })
   }
 }

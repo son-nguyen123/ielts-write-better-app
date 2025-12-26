@@ -2,6 +2,7 @@ import { generateObject } from "ai"
 import { getGoogleModel } from "@/lib/ai"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { createDiagnosticErrorResponse, diagnoseError } from "@/lib/error-utils"
 import { z } from "zod"
 
 export const maxDuration = 30
@@ -67,26 +68,23 @@ Make it specific to the topic and appropriate for the target band score.`,
   } catch (error: any) {
     console.error("[v0] Error generating outline:", error)
     
-    // Check for rate limit / quota errors
-    const errorMessage = error?.message || error?.toString() || ""
-    const isRateLimitError = 
-      error?.status === 429 ||
-      error?.response?.status === 429 ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorMessage.toLowerCase().includes("quota") ||
-      errorMessage.toLowerCase().includes("rate limit") ||
-      errorMessage.includes("429")
+    // Diagnose error with detailed information
+    const diagnostics = diagnoseError(error)
     
-    if (isRateLimitError) {
-      return Response.json({ 
-        error: "AI tạo dàn ý đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
-    }
+    // Log detailed diagnostic information
+    console.error("[generate-outline] Diagnostic information:", {
+      errorType: diagnostics.errorType,
+      statusCode: diagnostics.statusCode,
+      isCodeIssue: diagnostics.isCodeIssue,
+      isApiIssue: diagnostics.isApiIssue,
+      timestamp: diagnostics.timestamp,
+    })
     
-    return Response.json({ 
-      error: "Failed to generate outline",
-      errorType: "GENERIC"
-    }, { status: 500 })
+    // Create diagnostic response
+    const diagnosticResponse = createDiagnosticErrorResponse(error)
+    
+    // Return with appropriate status code
+    const statusCode = diagnostics.statusCode || 500
+    return Response.json(diagnosticResponse, { status: statusCode })
   }
 }
