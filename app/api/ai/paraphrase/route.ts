@@ -55,12 +55,30 @@ Each paraphrase should maintain the original meaning while demonstrating the spe
     
     // Check for rate limit / quota errors
     const errorMessage = error?.message || error?.toString() || ""
+    const errorString = errorMessage.toLowerCase()
+    
+    // Check if it's a missing API key error
+    const isMissingApiKeyError = 
+      errorString.includes("gemini_api_key") ||
+      errorString.includes("api key") && errorString.includes("not set") ||
+      errorString.includes("missing") && errorString.includes("api")
+    
+    if (isMissingApiKeyError) {
+      return Response.json({ 
+        error: "Missing GEMINI_API_KEY in environment",
+        message: "The GEMINI_API_KEY environment variable is not configured. Please set up your API key to use AI features.",
+        setupInstructions: "Create a .env.local file in the project root and add: GEMINI_API_KEY=your_api_key_here",
+        docsUrl: "https://aistudio.google.com/app/apikey",
+        errorType: "MISSING_API_KEY"
+      }, { status: 500 })
+    }
+    
     const isRateLimitError = 
       error?.status === 429 ||
       error?.response?.status === 429 ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorMessage.toLowerCase().includes("quota") ||
-      errorMessage.toLowerCase().includes("rate limit") ||
+      errorString.includes("too many requests") ||
+      errorString.includes("quota") ||
+      errorString.includes("rate limit") ||
       errorMessage.includes("429")
     
     if (isRateLimitError) {

@@ -58,8 +58,18 @@ export function FloatingChatWidget() {
         const response = await fetch("/api/ai/models")
 
         if (!response.ok) {
-          const { error } = await response.json().catch(() => ({ error: "" }))
-          throw new Error(error || "Failed to load Gemini models")
+          const errorData = await response.json().catch(() => ({ error: "" }))
+          
+          // Check if it's a missing API key error
+          if (errorData.errorType === "MISSING_API_KEY" || errorData.setupInstructions) {
+            throw new Error(
+              `⚠️ API Key Not Configured\n\n${errorData.message || "Missing GEMINI_API_KEY in environment"}\n\n` +
+              `Setup: ${errorData.setupInstructions || "Configure your .env.local file"}\n\n` +
+              `Get your API key at: ${errorData.docsUrl || "https://aistudio.google.com/app/apikey"}`
+            )
+          }
+          
+          throw new Error(errorData.error || "Failed to load Gemini models")
         }
 
         const data = await response.json()
@@ -180,9 +190,19 @@ export function FloatingChatWidget() {
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("too many requests")
       
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
+      // Check if it's a missing API key error
+      const isMissingApiKeyError = 
+        errorMessage.includes("API Key Not Configured") ||
+        errorMessage.includes("GEMINI_API_KEY") ||
+        errorMessage.toLowerCase().includes("missing") && errorMessage.toLowerCase().includes("api")
+      
+      let responseMessage = "Sorry, I encountered an error. Please try again."
+      
+      if (isMissingApiKeyError) {
+        responseMessage = "⚠️ **Configuration Required**\n\nThe AI features are not configured. Please ask the administrator to set up the GEMINI_API_KEY in the .env.local file.\n\nGet your API key at: https://aistudio.google.com/app/apikey"
+      } else if (isRateLimitError) {
+        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+      }
       
       setMessages((prev) => [
         ...prev,
@@ -264,9 +284,19 @@ export function FloatingChatWidget() {
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("too many requests")
       
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
+      // Check if it's a missing API key error
+      const isMissingApiKeyError = 
+        errorMessage.includes("API Key Not Configured") ||
+        errorMessage.includes("GEMINI_API_KEY") ||
+        errorMessage.toLowerCase().includes("missing") && errorMessage.toLowerCase().includes("api")
+      
+      let responseMessage = "Sorry, I encountered an error. Please try again."
+      
+      if (isMissingApiKeyError) {
+        responseMessage = "⚠️ **Configuration Required**\n\nThe AI features are not configured. Please ask the administrator to set up the GEMINI_API_KEY in the .env.local file.\n\nGet your API key at: https://aistudio.google.com/app/apikey"
+      } else if (isRateLimitError) {
+        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+      }
       
       setMessages((prev) => [
         ...prev,

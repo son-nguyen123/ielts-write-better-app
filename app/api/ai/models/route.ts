@@ -15,7 +15,12 @@ export async function GET() {
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing GEMINI_API_KEY in environment" },
+      { 
+        error: "Missing GEMINI_API_KEY in environment",
+        message: "The GEMINI_API_KEY environment variable is not configured. Please set up your API key to use AI features.",
+        setupInstructions: "Create a .env.local file in the project root and add: GEMINI_API_KEY=your_api_key_here",
+        docsUrl: "https://aistudio.google.com/app/apikey"
+      },
       { status: 500 },
     )
   }
