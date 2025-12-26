@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getGeminiModel } from "@/lib/gemini-native"
 import { retryWithBackoff, GEMINI_RETRY_CONFIG } from "@/lib/retry-utils"
 import { withRateLimit } from "@/lib/server-rate-limiter"
+import { createMissingApiKeyResponse } from "@/lib/error-utils"
 
 export const maxDuration = 30
 
@@ -25,12 +26,7 @@ export async function POST(req: Request) {
     }))
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ 
-        error: "Missing GEMINI_API_KEY in environment",
-        message: "The GEMINI_API_KEY environment variable is not configured. Please set up your API key to use AI features.",
-        setupInstructions: "Create a .env.local file in the project root and add: GEMINI_API_KEY=your_api_key_here",
-        docsUrl: "https://aistudio.google.com/app/apikey"
-      }, { status: 500 })
+      return NextResponse.json(createMissingApiKeyResponse(), { status: 500 })
     }
 
     let systemPrompt = `You are an expert IELTS writing tutor. Help students improve their writing by:

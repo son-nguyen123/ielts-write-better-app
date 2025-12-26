@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createMissingApiKeyResponse } from "@/lib/error-utils"
 
 const GEMINI_MODELS_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models"
 
@@ -14,15 +15,7 @@ export async function GET() {
   const apiKey = process.env.GEMINI_API_KEY
 
   if (!apiKey) {
-    return NextResponse.json(
-      { 
-        error: "Missing GEMINI_API_KEY in environment",
-        message: "The GEMINI_API_KEY environment variable is not configured. Please set up your API key to use AI features.",
-        setupInstructions: "Create a .env.local file in the project root and add: GEMINI_API_KEY=your_api_key_here",
-        docsUrl: "https://aistudio.google.com/app/apikey"
-      },
-      { status: 500 },
-    )
+    return NextResponse.json(createMissingApiKeyResponse(), { status: 500 })
   }
 
   try {

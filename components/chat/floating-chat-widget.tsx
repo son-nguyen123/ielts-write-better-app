@@ -13,6 +13,7 @@ import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Spar
 import { useAuth } from "@/components/auth/auth-provider"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
+import { formatMissingApiKeyMessage, formatRateLimitMessage } from "@/lib/error-utils"
 
 interface Message {
   role: "user" | "assistant"
@@ -34,6 +35,28 @@ interface ScoredEssay {
   overallBand: number
   feedback: any
   updatedAt: any
+}
+
+// Helper function to determine error type and format message
+function getErrorMessage(error: unknown): string {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  const isRateLimitError = 
+    errorMessage.toLowerCase().includes("vượt giới hạn") ||
+    errorMessage.toLowerCase().includes("rate limit") ||
+    errorMessage.toLowerCase().includes("quota") ||
+    errorMessage.toLowerCase().includes("too many requests")
+  
+  const isMissingApiKeyError = 
+    errorMessage.includes("API Key Not Configured") ||
+    errorMessage.includes("GEMINI_API_KEY") ||
+    errorMessage.toLowerCase().includes("missing") && errorMessage.toLowerCase().includes("api")
+  
+  if (isMissingApiKeyError) {
+    return formatMissingApiKeyMessage()
+  } else if (isRateLimitError) {
+    return formatRateLimitMessage()
+  }
+  return "Sorry, I encountered an error. Please try again."
 }
 
 export function FloatingChatWidget() {
@@ -182,28 +205,7 @@ export function FloatingChatWidget() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      const isRateLimitError = 
-        errorMessage.toLowerCase().includes("vượt giới hạn") ||
-        errorMessage.toLowerCase().includes("rate limit") ||
-        errorMessage.toLowerCase().includes("quota") ||
-        errorMessage.toLowerCase().includes("too many requests")
-      
-      // Check if it's a missing API key error
-      const isMissingApiKeyError = 
-        errorMessage.includes("API Key Not Configured") ||
-        errorMessage.includes("GEMINI_API_KEY") ||
-        errorMessage.toLowerCase().includes("missing") && errorMessage.toLowerCase().includes("api")
-      
-      let responseMessage = "Sorry, I encountered an error. Please try again."
-      
-      if (isMissingApiKeyError) {
-        responseMessage = "⚠️ **Configuration Required**\n\nThe AI features are not configured. Please ask the administrator to set up the GEMINI_API_KEY in the .env.local file.\n\nGet your API key at: https://aistudio.google.com/app/apikey"
-      } else if (isRateLimitError) {
-        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-      }
-      
+      const responseMessage = getErrorMessage(error)
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: responseMessage },
@@ -276,28 +278,7 @@ export function FloatingChatWidget() {
       }
     } catch (error) {
       console.error("[v0] Error in chat:", error)
-      
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      const isRateLimitError = 
-        errorMessage.toLowerCase().includes("vượt giới hạn") ||
-        errorMessage.toLowerCase().includes("rate limit") ||
-        errorMessage.toLowerCase().includes("quota") ||
-        errorMessage.toLowerCase().includes("too many requests")
-      
-      // Check if it's a missing API key error
-      const isMissingApiKeyError = 
-        errorMessage.includes("API Key Not Configured") ||
-        errorMessage.includes("GEMINI_API_KEY") ||
-        errorMessage.toLowerCase().includes("missing") && errorMessage.toLowerCase().includes("api")
-      
-      let responseMessage = "Sorry, I encountered an error. Please try again."
-      
-      if (isMissingApiKeyError) {
-        responseMessage = "⚠️ **Configuration Required**\n\nThe AI features are not configured. Please ask the administrator to set up the GEMINI_API_KEY in the .env.local file.\n\nGet your API key at: https://aistudio.google.com/app/apikey"
-      } else if (isRateLimitError) {
-        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-      }
-      
+      const responseMessage = getErrorMessage(error)
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: responseMessage },
