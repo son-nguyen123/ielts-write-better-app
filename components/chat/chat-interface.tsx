@@ -36,6 +36,14 @@ interface ScoredEssay {
   updatedAt: any
 }
 
+interface ChatError extends Error {
+  errorType?: "RATE_LIMIT" | "AUTH_ERROR" | "GENERIC"
+}
+
+function isChatError(error: unknown): error is ChatError {
+  return error instanceof Error
+}
+
 export function ChatInterface() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -173,15 +181,28 @@ export function ChatInterface() {
       
       // Check if it's a rate limit error
       const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorType = isChatError(error) ? error.errorType || "GENERIC" : "GENERIC"
+      
       const isRateLimitError = 
+        errorType === "RATE_LIMIT" ||
         errorMessage.toLowerCase().includes("vượt giới hạn") ||
         errorMessage.toLowerCase().includes("rate limit") ||
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("too many requests")
       
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
+      const isAuthError = 
+        errorType === "AUTH_ERROR" ||
+        errorMessage.toLowerCase().includes("xác thực") ||
+        errorMessage.toLowerCase().includes("api key") ||
+        errorMessage.toLowerCase().includes("permission")
+      
+      let responseMessage = "Sorry, I encountered an error. Please try again."
+      
+      if (isRateLimitError) {
+        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+      } else if (isAuthError) {
+        responseMessage = "Lỗi xác thực API. Vui lòng kiểm tra cấu hình API key hoặc liên hệ quản trị viên."
+      }
       
       setMessages((prev) => [
         ...prev,
@@ -257,15 +278,28 @@ export function ChatInterface() {
       console.error("[v0] Error in chat:", error)
       
       const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorType = isChatError(error) ? error.errorType || "GENERIC" : "GENERIC"
+      
       const isRateLimitError = 
+        errorType === "RATE_LIMIT" ||
         errorMessage.toLowerCase().includes("vượt giới hạn") ||
         errorMessage.toLowerCase().includes("rate limit") ||
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("too many requests")
       
-      const responseMessage = isRateLimitError 
-        ? "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-        : "Sorry, I encountered an error. Please try again."
+      const isAuthError = 
+        errorType === "AUTH_ERROR" ||
+        errorMessage.toLowerCase().includes("xác thực") ||
+        errorMessage.toLowerCase().includes("api key") ||
+        errorMessage.toLowerCase().includes("permission")
+      
+      let responseMessage = "Sorry, I encountered an error. Please try again."
+      
+      if (isRateLimitError) {
+        responseMessage = "Xin lỗi, AI đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+      } else if (isAuthError) {
+        responseMessage = "Lỗi xác thực API. Vui lòng kiểm tra cấu hình API key hoặc liên hệ quản trị viên."
+      }
       
       setMessages((prev) => [
         ...prev,

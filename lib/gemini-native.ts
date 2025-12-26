@@ -14,12 +14,23 @@ export function getGeminiClient() {
   return genAI
 }
 
+/**
+ * Get Gemini model with fallback support
+ * Priority order:
+ * 1. Provided modelName (if specified) - allows custom model selection from API callers
+ * 2. gemini-2.0-flash-exp (experimental version with higher rate limits)
+ * 
+ * Note: Model validation is handled by the Gemini API itself. Invalid model names
+ * will result in an API error that should be caught by the caller.
+ */
 export function getGeminiModel(modelName?: string) {
   const client = getGeminiClient()
-  // Always use gemini-2.0-flash for scoring - do not allow overrides
-  const model = "gemini-2.0-flash"
+  
+  // Use provided model name, or default to experimental flash model
+  // gemini-2.0-flash-exp has higher rate limits than other models
+  const model = modelName || "gemini-2.0-flash-exp"
+  
   return client.getGenerativeModel({ 
     model,
-    // Ensure we're using v1 API, not v1beta
   })
 }

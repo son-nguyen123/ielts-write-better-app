@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-const DEFAULT_GOOGLE_MODEL = "gemini-2.0-flash"
+// Use experimental model with higher rate limits
+const DEFAULT_GOOGLE_MODEL = "gemini-2.0-flash-exp"
 
 let googleClient: ReturnType<typeof createGoogleGenerativeAI> | undefined
 
