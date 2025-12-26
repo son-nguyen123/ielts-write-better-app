@@ -10,6 +10,25 @@ interface GeminiModel {
   supportedGenerationMethods?: string[]
 }
 
+// Fallback models in case API fetch fails
+const FALLBACK_MODELS = [
+  {
+    id: "gemini-2.0-flash-exp",
+    displayName: "Gemini 2.0 Flash (Experimental)",
+    description: "Fast and efficient model with higher rate limits"
+  },
+  {
+    id: "gemini-1.5-flash",
+    displayName: "Gemini 1.5 Flash",
+    description: "Stable and reliable flash model"
+  },
+  {
+    id: "gemini-1.5-pro",
+    displayName: "Gemini 1.5 Pro",
+    description: "Most capable model with advanced reasoning"
+  }
+]
+
 export async function GET() {
   const apiKey = process.env.GEMINI_API_KEY
 
@@ -29,10 +48,14 @@ export async function GET() {
     if (!response.ok) {
       const errorBody = await response.text()
       console.error("[GET /api/ai/models] Failed to list models", response.status, errorBody)
-      return NextResponse.json(
-        { error: "Failed to fetch Gemini models" },
-        { status: response.status === 404 ? 404 : 502 },
-      )
+      
+      // Return fallback models instead of failing completely
+      console.log("[GET /api/ai/models] Using fallback models")
+      return NextResponse.json({ 
+        models: FALLBACK_MODELS, 
+        defaultModelId: "gemini-2.0-flash-exp",
+        fallback: true
+      })
     }
 
     const payload = (await response.json()) as { models?: GeminiModel[] }
@@ -54,20 +77,32 @@ export async function GET() {
       .filter((model) => model.id)
 
     if (models.length === 0) {
-      return NextResponse.json(
-        { error: "No Gemini models available" },
-        { status: 404 },
-      )
+      // Return fallback models instead of failing
+      console.log("[GET /api/ai/models] No models found, using fallback")
+      return NextResponse.json({ 
+        models: FALLBACK_MODELS, 
+        defaultModelId: "gemini-2.0-flash-exp",
+        fallback: true
+      })
     }
 
-    const defaultModelId = models.find((model) => model.id.includes("flash"))?.id ?? models[0]?.id
+    // Prefer experimental flash model for better rate limits
+    const defaultModelId = models.find((model) => 
+      model.id.includes("2.0-flash-exp")
+    )?.id ?? models.find((model) => 
+      model.id.includes("flash")
+    )?.id ?? models[0]?.id
 
     return NextResponse.json({ models, defaultModelId })
   } catch (error) {
     console.error("[GET /api/ai/models] Unexpected error", error)
-    return NextResponse.json(
-      { error: "Failed to fetch Gemini models" },
-      { status: 500 },
-    )
+    
+    // Return fallback models instead of failing completely
+    console.log("[GET /api/ai/models] Error occurred, using fallback models")
+    return NextResponse.json({ 
+      models: FALLBACK_MODELS, 
+      defaultModelId: "gemini-2.0-flash-exp",
+      fallback: true
+    })
   }
 }

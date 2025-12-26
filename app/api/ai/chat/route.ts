@@ -50,7 +50,9 @@ Essay: ${attachedTask?.essay ?? ""}`
       parts: [{ text: msg.content }],
     }))
 
-    const geminiModel = getGeminiModel(typeof model === "string" && model.trim() ? model : undefined)
+    // Use experimental model for better rate limits, or user-selected model
+    const modelName = typeof model === "string" && model.trim() ? model : "gemini-2.0-flash-exp"
+    const geminiModel = getGeminiModel(modelName)
 
     const chat = geminiModel.startChat({
       history: geminiMessages.slice(0, -1),
@@ -118,6 +120,21 @@ Essay: ${attachedTask?.essay ?? ""}`
         error: "AI chat đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
         errorType: "RATE_LIMIT"
       }, { status: 429 })
+    }
+    
+    // Check for API key or permission errors
+    const isAuthError = 
+      err?.status === 401 ||
+      err?.status === 403 ||
+      errorMessage.toLowerCase().includes("api key") ||
+      errorMessage.toLowerCase().includes("permission") ||
+      errorMessage.toLowerCase().includes("unauthorized")
+    
+    if (isAuthError) {
+      return NextResponse.json({ 
+        error: "Lỗi xác thực API. Vui lòng kiểm tra cấu hình API key.",
+        errorType: "AUTH_ERROR"
+      }, { status: 503 })
     }
     
     return NextResponse.json({ 
