@@ -28,6 +28,55 @@ Một nền tảng toàn diện giúp bạn nâng cao điểm IELTS Writing thô
 
 ---
 
+## ⚠️ QUAN TRỌNG: Cấu hình API Key
+
+> **🔴 TẤT CẢ TÍNH NĂNG AI TRONG ỨNG DỤNG SẼ KHÔNG HOẠT ĐỘNG NẾU BẠN CHƯA CẤU HÌNH `GEMINI_API_KEY`**
+
+Trước khi chạy ứng dụng, bạn **BẮT BUỘC** phải có Gemini API Key (miễn phí) từ Google. Nếu thiếu API key, tất cả các tính năng AI sẽ báo lỗi:
+- ❌ Chấm điểm bài viết không hoạt động
+- ❌ Kiểm tra ngữ pháp không hoạt động  
+- ❌ Diễn giải câu không hoạt động
+- ❌ AI chat không hoạt động
+- ❌ Tạo outline không hoạt động
+
+### 🚀 Cách Cấu hình Nhanh (2 phút)
+
+**Bước 1:** Lấy API Key miễn phí
+1. Truy cập: https://aistudio.google.com/app/apikey
+2. Đăng nhập bằng tài khoản Google
+3. Nhấn "Create API key"
+4. Sao chép API key
+
+**Bước 2:** Tạo file `.env.local` trong thư mục gốc project
+
+```bash
+# Sao chép file mẫu
+cp .env.local.template .env.local
+
+# Hoặc tạo mới và thêm dòng này:
+echo "GEMINI_API_KEY=your_api_key_here" > .env.local
+```
+
+**Bước 3:** Dán API key vào file `.env.local`
+
+```env
+GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+**Bước 4:** Khởi động lại ứng dụng
+
+```bash
+npm run dev
+# hoặc
+pnpm dev
+```
+
+✅ **Hoàn tất!** Tất cả tính năng AI giờ đã hoạt động.
+
+📖 **Xem hướng dẫn chi tiết tại:** [Bước 4: Thiết lập Google Gemini AI](#bước-4-thiết-lập-google-gemini-ai)
+
+---
+
 ## ✨ Tính năng chính
 
 ### 🤖 1. Chấm điểm & Phản hồi AI Thông minh
@@ -277,9 +326,13 @@ yarn install
 
 #### 5.1. Tạo file `.env.local`
 
-Copy file example:
+Copy file template với hướng dẫn chi tiết:
 
 ```bash
+# Khuyên dùng: Sao chép file template có hướng dẫn tiếng Việt
+cp .env.local.template .env.local
+
+# Hoặc từ file example đơn giản hơn
 cp .env.example .env.local
 ```
 
