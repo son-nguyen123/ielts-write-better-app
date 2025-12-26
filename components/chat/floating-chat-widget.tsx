@@ -13,7 +13,7 @@ import { Send, Bot, User, ChevronDown, FileText, CheckCircle2, AlertCircle, Spar
 import { useAuth } from "@/components/auth/auth-provider"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
-import { formatMissingApiKeyMessage, formatRateLimitMessage } from "@/lib/error-utils"
+import { formatMissingApiKeyMessage, formatRateLimitMessage, isMissingApiKeyError } from "@/lib/error-utils"
 
 interface Message {
   role: "user" | "assistant"
@@ -46,12 +46,7 @@ function getErrorMessage(error: unknown): string {
     errorMessage.toLowerCase().includes("quota") ||
     errorMessage.toLowerCase().includes("too many requests")
   
-  const isMissingApiKeyError = 
-    errorMessage.includes("API Key Not Configured") ||
-    errorMessage.includes("GEMINI_API_KEY") ||
-    errorMessage.toLowerCase().includes("missing") && errorMessage.toLowerCase().includes("api")
-  
-  if (isMissingApiKeyError) {
+  if (isMissingApiKeyError(errorMessage)) {
     return formatMissingApiKeyMessage()
   } else if (isRateLimitError) {
     return formatRateLimitMessage()
