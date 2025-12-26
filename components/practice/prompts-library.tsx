@@ -60,12 +60,23 @@ export function PromptsLibrary() {
       const result = await response.json()
 
       if (!response.ok) {
-        // Check for rate limit errors
-        if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
-          throw new Error(result?.error || "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
-        } else {
-          throw new Error(result?.error || "Failed to generate prompts. Please try again.")
+        let errorMessage = result?.error || "Failed to generate prompts. Please try again."
+        
+        // Check for missing API key
+        if (result?.errorType === "MISSING_API_KEY") {
+          errorMessage = `⚠️ Thiếu GEMINI_API_KEY.\n\n` +
+            "Hướng dẫn:\n" +
+            "1. Lấy API key tại: https://aistudio.google.com/app/apikey\n" +
+            "2. Tạo file .env.local\n" +
+            "3. Thêm: GEMINI_API_KEY=your_key\n" +
+            "4. Khởi động lại app"
         }
+        // Check for rate limit errors
+        else if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+          errorMessage = result?.error || "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+        }
+        
+        throw new Error(errorMessage)
       }
 
       setPrompts(result.prompts)

@@ -36,10 +36,19 @@ export function isRateLimitError(error: any): boolean {
  */
 export function createMissingApiKeyResponse() {
   return {
-    error: "Missing GEMINI_API_KEY in environment",
-    message: "The GEMINI_API_KEY environment variable is not configured. Please set up your API key to use AI features.",
-    setupInstructions: "Create a .env.local file in the project root and add: GEMINI_API_KEY=your_api_key_here",
+    error: "Thiếu GEMINI_API_KEY trong cấu hình",
+    message: "Biến môi trường GEMINI_API_KEY chưa được cấu hình. Vui lòng thiết lập API key để sử dụng các tính năng AI.",
+    setupInstructions: "Tạo file .env.local trong thư mục gốc project và thêm: GEMINI_API_KEY=your_api_key_here",
+    detailedSteps: [
+      "1. Truy cập https://aistudio.google.com/app/apikey",
+      "2. Đăng nhập bằng tài khoản Google",
+      "3. Nhấn 'Create API key'",
+      "4. Sao chép API key",
+      "5. Tạo file .env.local và thêm: GEMINI_API_KEY=your_api_key",
+      "6. Khởi động lại ứng dụng (npm run dev)"
+    ],
     docsUrl: "https://aistudio.google.com/app/apikey",
+    templateFile: ".env.local.template",
     errorType: "MISSING_API_KEY"
   }
 }
@@ -49,9 +58,14 @@ export function createMissingApiKeyResponse() {
  */
 export function formatMissingApiKeyMessage(): string {
   return (
-    "⚠️ **Configuration Required**\n\n" +
-    "The AI features are not configured. Please ask the administrator to set up the GEMINI_API_KEY in the .env.local file.\n\n" +
-    "Get your API key at: https://aistudio.google.com/app/apikey"
+    "⚠️ **Cần Cấu Hình API Key**\n\n" +
+    "Các tính năng AI chưa được cấu hình. Vui lòng thiết lập GEMINI_API_KEY trong file .env.local.\n\n" +
+    "**Cách thiết lập nhanh:**\n" +
+    "1. Truy cập: https://aistudio.google.com/app/apikey\n" +
+    "2. Tạo API key miễn phí\n" +
+    "3. Tạo file .env.local và thêm: GEMINI_API_KEY=your_key\n" +
+    "4. Khởi động lại ứng dụng\n\n" +
+    "📖 Xem hướng dẫn chi tiết trong file .env.local.template"
   )
 }
 
