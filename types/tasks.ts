@@ -26,6 +26,7 @@ export interface TaskFeedback {
   criteria: Record<CriterionKey, CriterionFeedback>
   actionItems: string[]
   lineLevelFeedback?: LineLevelFeedback[]
+  revisedEssay?: string
 }
 
 export interface Revision {

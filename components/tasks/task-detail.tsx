@@ -651,12 +651,19 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                   <TabsContent value="paragraph" className="space-y-3 mt-4">
                     <div className="space-y-4">
                       <div>
-                        <h4 className="text-sm font-semibold mb-2">Corrected Version (with all suggestions applied):</h4>
+                        <h4 className="text-sm font-semibold mb-2">
+                          {task.feedback.revisedEssay ? "AI-Revised Essay:" : "Corrected Version (with all suggestions applied):"}
+                        </h4>
                         <div className="p-4 bg-muted/50 rounded-lg">
                           <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                            {renderCorrectedText(task.response || "", task.feedback.lineLevelFeedback)}
+                            {task.feedback.revisedEssay || renderCorrectedText(task.response || "", task.feedback.lineLevelFeedback)}
                           </div>
                         </div>
+                        {task.feedback.revisedEssay && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            This is an AI-generated revised version that incorporates all corrections and improvements.
+                          </p>
+                        )}
                       </div>
                       
                       <div className="text-sm text-muted-foreground">

@@ -47,6 +47,14 @@ For each error found, provide:
 - Clear explanation of the problem
 - A suggested correction/rewrite
 
+REVISED ESSAY REQUIREMENT:
+After providing the evaluation, you MUST also provide a revised version of the essay that incorporates all corrections and improvements. The revised essay should:
+- Fix all grammatical errors
+- Improve vocabulary and word choice
+- Enhance coherence and cohesion
+- Better address the task requirements
+- Maintain the original writer's ideas and arguments while expressing them more effectively
+
 Provide detailed, actionable feedback with specific examples from the text.
 
 Return your response as a JSON object with this exact structure:
@@ -74,10 +82,13 @@ Return your response as a JSON object with this exact structure:
       "comment": "Explain the specific error or issue here.",
       "suggested_rewrite": "Provide the corrected version here."
     }
-  ]
+  ],
+  "revised_essay": "The complete revised version of the essay with all corrections and improvements applied."
 }
 
-IMPORTANT: Provide line-level feedback for any errors or areas for improvement found in the essay. If the essay is exceptionally well-written with no significant errors, the line_level_feedback array may be empty, but this should be rare.`
+IMPORTANT: 
+1. Provide line-level feedback for any errors or areas for improvement found in the essay. If the essay is exceptionally well-written with no significant errors, the line_level_feedback array may be empty, but this should be rare.
+2. ALWAYS include the revised_essay field with a complete, improved version of the essay.`
 
     const userPrompt = `PROMPT (This is what the essay MUST respond to):
 ${promptText || "No specific prompt provided"}
@@ -102,7 +113,7 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
             generationConfig: {
               temperature: 0.3,
               responseMimeType: "application/json",
-              maxOutputTokens: 2048,
+              maxOutputTokens: 4096,
             },
           }),
           GEMINI_RETRY_CONFIG
@@ -163,7 +174,8 @@ Provide a comprehensive IELTS evaluation following the JSON structure specified.
       summary: parsedFeedback.summary || "Overall assessment of the essay.",
       criteria: transformCriteria(parsedFeedback.criteria),
       actionItems: parsedFeedback.action_plan || [],
-      lineLevelFeedback: transformLineLevelFeedback(parsedFeedback.line_level_feedback || [])
+      lineLevelFeedback: transformLineLevelFeedback(parsedFeedback.line_level_feedback || []),
+      revisedEssay: parsedFeedback.revised_essay || undefined
     }
 
     return Response.json({ 
