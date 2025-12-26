@@ -69,7 +69,13 @@ export function PromptsLibrary() {
       }
 
       setPrompts(result.prompts)
-      toast.success("New prompts generated!")
+      
+      // Show appropriate message based on whether using sample data
+      if (result.usingSampleData) {
+        toast.info(result.message || "Đang sử dụng đề bài mẫu do giới hạn API")
+      } else {
+        toast.success("New prompts generated!")
+      }
     } catch (error: any) {
       console.error("Error generating prompts:", error)
       toast.error(error?.message || "Failed to generate prompts. Please try again.")

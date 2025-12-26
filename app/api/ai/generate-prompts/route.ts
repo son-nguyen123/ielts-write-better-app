@@ -78,9 +78,9 @@ function generateSamplePrompts(taskType: string, topics: string[], count: number
 
   for (let i = 0; i < count; i++) {
     const topic = selectedTopics[i % selectedTopics.length]
-    const shouldBeTask1 = taskType === "Task 1" || (taskType === "all" && Math.random() > 0.5)
+    const shouldBeTask1 = taskType === "Task 1" || (taskType !== "Task 2" && Math.random() > 0.5)
 
-    if (shouldBeTask1 && taskType !== "Task 2") {
+    if (shouldBeTask1) {
       const template = task1Templates[0].templates[i % task1Templates[0].templates.length]
       prompts.push(template(topic))
     } else {
@@ -93,13 +93,13 @@ function generateSamplePrompts(taskType: string, topics: string[], count: number
 }
 
 export async function POST(req: Request) {
+  // Parse request body once
+  const { taskType, topics, count } = await req.json()
+  const promptCount = count || 4
+  const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
+  const selectedTaskType = taskType || "all"
+
   try {
-    const { taskType, topics, count } = await req.json()
-
-    const promptCount = count || 4
-    const selectedTopics = topics && topics.length > 0 ? topics : ["general"]
-    const selectedTaskType = taskType || "all"
-
     // Check if API key is available
     if (!process.env.GEMINI_API_KEY) {
       console.log("[v0] GEMINI_API_KEY not found, using sample prompts")
@@ -167,10 +167,14 @@ Ensure variety in:
       errorMessage.includes("429")
     
     if (isRateLimitError) {
+      // Fallback to sample prompts when rate limit is hit
+      console.log("[v0] Rate limit hit, falling back to sample prompts")
+      const samplePrompts = generateSamplePrompts(selectedTaskType, selectedTopics, promptCount)
       return Response.json({ 
-        error: "AI tạo đề bài đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.",
-        errorType: "RATE_LIMIT"
-      }, { status: 429 })
+        prompts: samplePrompts,
+        usingSampleData: true,
+        message: "Đang sử dụng đề bài mẫu do giới hạn API. Các đề bài vẫn phù hợp để luyện tập."
+      })
     }
     
     return Response.json({ 
