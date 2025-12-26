@@ -41,6 +41,22 @@ Trước khi chạy ứng dụng, bạn **BẮT BUỘC** phải có Gemini API K
 
 ### 🚀 Cách Cấu hình Nhanh (2 phút)
 
+#### Tùy chọn 1: Sử dụng script tự động (Khuyên dùng) ⭐
+
+**Trên Linux/Mac:**
+```bash
+bash setup.sh
+```
+
+**Trên Windows:**
+```cmd
+setup.bat
+```
+
+Script sẽ hướng dẫn bạn từng bước để lấy và cấu hình API key tự động.
+
+#### Tùy chọn 2: Cấu hình thủ công
+
 **Bước 1:** Lấy API Key miễn phí
 1. Truy cập: https://aistudio.google.com/app/apikey
 2. Đăng nhập bằng tài khoản Google
@@ -73,7 +89,13 @@ pnpm dev
 
 ✅ **Hoàn tất!** Tất cả tính năng AI giờ đã hoạt động.
 
-📖 **Xem hướng dẫn chi tiết tại:** [Bước 4: Thiết lập Google Gemini AI](#bước-4-thiết-lập-google-gemini-ai)
+### 🔧 Gặp vấn đề?
+
+Nếu vẫn gặp lỗi sau khi cấu hình, xem hướng dẫn chi tiết:
+- 📖 **[HUONG_DAN_SUA_LOI_AI.md](./HUONG_DAN_SUA_LOI_AI.md)** - Hướng dẫn khắc phục lỗi toàn diện (Tiếng Việt)
+- 📖 **[FIX_GEMINI_API_KEY.md](./FIX_GEMINI_API_KEY.md)** - Detailed troubleshooting guide (English)
+
+📋 Xem hướng dẫn chi tiết tại: [Bước 4: Thiết lập Google Gemini AI](#bước-4-thiết-lập-google-gemini-ai)
 
 ---
 
