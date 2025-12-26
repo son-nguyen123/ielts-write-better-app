@@ -86,13 +86,21 @@ export async function GET() {
       })
     }
 
-    // Prefer experimental flash model for better rate limits
-    // Priority: exact match for 2.0-flash-exp > contains "flash" > first available
-    const defaultModelId = models.find((model) => 
-      model.id === "gemini-2.0-flash-exp"
-    )?.id ?? models.find((model) => 
-      model.id.startsWith("gemini-") && model.id.includes("flash")
-    )?.id ?? models[0]?.id
+    // Helper function to select the best default model
+    function selectDefaultModel(models: Array<{ id: string }>) {
+      // Priority: exact match for 2.0-flash-exp > contains "flash" > first available
+      const exactMatch = models.find((model) => model.id === "gemini-2.0-flash-exp")
+      if (exactMatch) return exactMatch.id
+
+      const flashModel = models.find((model) => 
+        model.id.startsWith("gemini-") && model.id.includes("flash")
+      )
+      if (flashModel) return flashModel.id
+
+      return models[0]?.id
+    }
+
+    const defaultModelId = selectDefaultModel(models)
 
     return NextResponse.json({ models, defaultModelId })
   } catch (error) {

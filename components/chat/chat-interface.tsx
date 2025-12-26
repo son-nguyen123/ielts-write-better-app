@@ -40,6 +40,10 @@ interface ChatError extends Error {
   errorType?: "RATE_LIMIT" | "AUTH_ERROR" | "GENERIC"
 }
 
+function isChatError(error: unknown): error is ChatError {
+  return error instanceof Error
+}
+
 export function ChatInterface() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -177,8 +181,7 @@ export function ChatInterface() {
       
       // Check if it's a rate limit error
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const chatError = error as ChatError
-      const errorType = chatError?.errorType || "GENERIC"
+      const errorType = isChatError(error) ? error.errorType || "GENERIC" : "GENERIC"
       
       const isRateLimitError = 
         errorType === "RATE_LIMIT" ||
@@ -275,8 +278,7 @@ export function ChatInterface() {
       console.error("[v0] Error in chat:", error)
       
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const chatError = error as ChatError
-      const errorType = chatError?.errorType || "GENERIC"
+      const errorType = isChatError(error) ? error.errorType || "GENERIC" : "GENERIC"
       
       const isRateLimitError = 
         errorType === "RATE_LIMIT" ||
