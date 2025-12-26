@@ -275,6 +275,8 @@ yarn install
 
 ### Bước 5: Cấu hình Environment Variables
 
+> 📖 **Xem hướng dẫn chi tiết về Environment Variables cho deployment:** [ENVIRONMENT_VARIABLES_GUIDE.md](./ENVIRONMENT_VARIABLES_GUIDE.md)
+
 #### 5.1. Tạo file `.env.local`
 
 Copy file example:
@@ -289,14 +291,14 @@ Mở file `.env.local` và điền các thông tin:
 
 ```env
 # ============================================
-# GEMINI AI CONFIGURATION
+# GEMINI AI CONFIGURATION (BẮT BUỘC)
 # ============================================
 # API Key từ Google AI Studio
 # Get your key at: https://aistudio.google.com/app/apikey
 GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 # ============================================
-# FIREBASE CONFIGURATION
+# FIREBASE CONFIGURATION (TÙY CHỌN)
 # ============================================
 # Lấy từ Firebase Console > Project Settings > Your apps > SDK setup and configuration
 
@@ -308,7 +310,9 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
 NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789012:web:abcdef123456
 ```
 
-> **Lưu ý**: File `.env.local` đã được thêm vào `.gitignore`, không bao giờ commit file này lên Git!
+> **Lưu ý**: 
+> - File `.env.local` đã được thêm vào `.gitignore`, không bao giờ commit file này lên Git!
+> - Chỉ `GEMINI_API_KEY` là bắt buộc. Firebase variables chỉ cần nếu bạn dùng authentication/database.
 
 ### Bước 6: Cấu hình Firebase Code
 
@@ -969,6 +973,8 @@ git push origin feature/ten-tinh-nang
 
 ## 🚢 Deployment
 
+> 📖 **Xem hướng dẫn chi tiết về Environment Variables:** [ENVIRONMENT_VARIABLES_GUIDE.md](./ENVIRONMENT_VARIABLES_GUIDE.md)
+
 ### Deploy lên Vercel (Khuyên dùng)
 
 #### Bước 1: Chuẩn bị
@@ -985,10 +991,17 @@ git push origin feature/ten-tinh-nang
 
 #### Bước 3: Cấu hình Environment Variables
 
+⚠️ **QUAN TRỌNG:** Xem hướng dẫn chi tiết trong [ENVIRONMENT_VARIABLES_GUIDE.md](./ENVIRONMENT_VARIABLES_GUIDE.md)
+
 Trong Vercel Dashboard, thêm các biến môi trường:
 
+**BẮT BUỘC:**
 ```
-GEMINI_API_KEY=...
+GEMINI_API_KEY=your_api_key_here
+```
+
+**TÙY CHỌN (chỉ nếu dùng Firebase):**
+```
 NEXT_PUBLIC_FIREBASE_API_KEY=...
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
