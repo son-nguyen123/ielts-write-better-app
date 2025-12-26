@@ -28,14 +28,27 @@ export function EssayPlanner() {
       const result = await response.json()
       
       if (!response.ok) {
+        let errorTitle = "Error"
+        let errorMessage = result?.error || "Failed to generate outline. Please try again."
+        
+        // Check for missing API key
+        if (result?.errorType === "MISSING_API_KEY") {
+          errorTitle = "⚠️ Cần Cấu Hình API Key"
+          errorMessage = `${result?.error || "Thiếu GEMINI_API_KEY."}\n\n` +
+            "Hướng dẫn:\n" +
+            "1. Lấy API key tại: https://aistudio.google.com/app/apikey\n" +
+            "2. Tạo file .env.local\n" +
+            "3. Thêm: GEMINI_API_KEY=your_key\n" +
+            "4. Khởi động lại app"
+        }
         // Check for rate limit errors
-        const isRateLimitError = response.status === 429 || result?.errorType === "RATE_LIMIT"
-        const errorMessage = isRateLimitError
-          ? result?.error || "AI tạo dàn ý đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
-          : result?.error || "Failed to generate outline. Please try again."
+        else if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+          errorTitle = "Vượt giới hạn sử dụng"
+          errorMessage = result?.error || "AI tạo dàn ý đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+        }
         
         const error: any = new Error(errorMessage)
-        error.title = isRateLimitError ? "Vượt giới hạn sử dụng" : "Error"
+        error.title = errorTitle
         throw error
       }
       

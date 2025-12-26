@@ -26,14 +26,28 @@ export function GrammarChecker() {
       const result = await response.json()
       
       if (!response.ok) {
-        // Check for rate limit errors
-        if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
-          const error: any = new Error(result?.error || "AI kiểm tra ngữ pháp đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút.")
-          error.title = "Vượt giới hạn sử dụng"
-          throw error
-        } else {
-          throw new Error(result?.error || "Failed to check grammar. Please try again.")
+        let errorTitle = "Error"
+        let errorMessage = result?.error || "Failed to check grammar. Please try again."
+        
+        // Check for missing API key
+        if (result?.errorType === "MISSING_API_KEY") {
+          errorTitle = "⚠️ Cần Cấu Hình API Key"
+          errorMessage = `${result?.error || "Thiếu GEMINI_API_KEY."}\n\n` +
+            "Hướng dẫn:\n" +
+            "1. Lấy API key tại: https://aistudio.google.com/app/apikey\n" +
+            "2. Tạo file .env.local\n" +
+            "3. Thêm: GEMINI_API_KEY=your_key\n" +
+            "4. Khởi động lại app"
         }
+        // Check for rate limit errors
+        else if (response.status === 429 || result?.errorType === "RATE_LIMIT") {
+          errorTitle = "Vượt giới hạn sử dụng"
+          errorMessage = result?.error || "AI kiểm tra ngữ pháp đang vượt giới hạn sử dụng. Vui lòng thử lại sau vài phút."
+        }
+        
+        const error: any = new Error(errorMessage)
+        error.title = errorTitle
+        throw error
       }
       
       if (result.issues) {

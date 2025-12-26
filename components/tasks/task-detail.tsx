@@ -97,8 +97,33 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
       const data = await response.json()
 
+      const data = await response.json().catch(() => null)
+      
       if (!response.ok || !data?.feedback) {
-        throw new Error(data?.error || "Failed to re-evaluate essay")
+        // Check for different error types
+        let errorTitle = "Re-evaluation failed"
+        let errorMessage = data?.error || "Failed to re-evaluate essay"
+        
+        // Missing API Key error
+        if (data?.errorType === "MISSING_API_KEY") {
+          errorTitle = "⚠️ API Key Configuration Required"
+          errorMessage = `${data?.error || "Missing GEMINI_API_KEY in configuration."}\n\n` +
+            "Quick Setup:\n" +
+            "1. Get free API key: https://aistudio.google.com/app/apikey\n" +
+            "2. Create .env.local file in project root\n" +
+            "3. Add: GEMINI_API_KEY=your_api_key\n" +
+            "4. Restart the app\n\n" +
+            "See HUONG_DAN_SUA_LOI_AI.md for detailed instructions"
+        }
+        // Rate limit error
+        else if (response.status === 429 || data?.errorType === "RATE_LIMIT") {
+          errorTitle = "Rate Limit Reached"
+          errorMessage = data?.error || "AI scoring is temporarily unavailable. Please try again in 1-2 minutes."
+        }
+        
+        const error: any = new Error(errorMessage)
+        error.title = errorTitle
+        throw error
       }
 
       // Add the new revision to the task
@@ -121,9 +146,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     } catch (error: any) {
       console.error("[v0] Re-evaluation failed:", error)
       toast({
-        title: "Re-evaluation failed",
+        title: error.title || "Re-evaluation failed",
         description: error.message || "Unable to re-evaluate essay. Please try again.",
         variant: "destructive",
+        duration: error.title?.includes("API Key") ? 10000 : 5000, // Longer for setup instructions
       })
     } finally {
       setIsRevaluating(false)

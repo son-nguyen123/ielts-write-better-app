@@ -148,18 +148,33 @@ export function NewTaskForm() {
       const data = await scoringResponse.json().catch(() => null)
 
       if (!scoringResponse.ok || !data?.feedback) {
-        // Check for rate limit errors
+        // Check for different error types
         let errorTitle = "Lỗi chấm điểm"
         let errorMessage = data?.error || "Không thể chấm điểm bài viết. Vui lòng thử lại."
+        let isRetryable = false
         
-        if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
+        // Missing API Key error
+        if (data?.errorType === "MISSING_API_KEY") {
+          errorTitle = "⚠️ Cần Cấu Hình API Key"
+          errorMessage = `${data?.error || "Thiếu GEMINI_API_KEY trong cấu hình."}\n\n` +
+            "📋 Hướng dẫn nhanh:\n" +
+            "1. Lấy API key miễn phí tại: https://aistudio.google.com/app/apikey\n" +
+            "2. Tạo file .env.local trong thư mục gốc project\n" +
+            "3. Thêm dòng: GEMINI_API_KEY=your_api_key\n" +
+            "4. Khởi động lại ứng dụng\n\n" +
+            "📖 Xem chi tiết trong file HUONG_DAN_SUA_LOI_AI.md"
+          isRetryable = false
+        }
+        // Rate limit error
+        else if (scoringResponse.status === 429 || data?.errorType === "RATE_LIMIT") {
           errorTitle = "Hệ thống đang bận"
           errorMessage = data?.error || "AI chấm điểm đang vượt giới hạn sử dụng. Vui lòng thử lại sau 1-2 phút."
+          isRetryable = true
         }
         
         const error: any = new Error(errorMessage)
         error.title = errorTitle
-        error.retryable = scoringResponse.status === 429
+        error.retryable = isRetryable
         throw error
       }
 
